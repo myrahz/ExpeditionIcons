@@ -25,4 +25,5 @@ public enum IconPickerIndex
     Quantity,
     Currency,
     StackedDecks,
+    RunicMonsterDuplication,
 }

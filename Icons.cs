@@ -154,7 +154,15 @@ public static class Icons
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierPackSize",
-                "ExpeditionRelicModifierRareMonsterChance",
+                "ExpeditionRelicModifierRareMonsterChance"
+            },
+        },
+        new()
+        {
+            IconPickerIndex = IconPickerIndex.RunicMonsterDuplication,
+            Icon = MapIconsIndex.ExpeditionBoss,
+            BaseEntityMetadataSubstrings =
+            {
                 "ExpeditionRelicModifierElitesDuplicated"
             },
         },
