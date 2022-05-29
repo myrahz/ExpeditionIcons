@@ -8,234 +8,15 @@ using ExileCore.PoEMemory.Elements;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
-using ExileCore.Shared.Nodes;
+using ImGuiNET;
 using SharpDX;
+using Vector2 = SharpDX.Vector2;
+using Vector4 = System.Numerics.Vector4;
 
 namespace ExpeditionIcons;
 
-public class ExpeditionMarkerIconDescription
+public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 {
-    public MapIconsIndex Icon { get; set; }
-    public List<string> BaseEntityMetadataSubstrings { get; set; } = new List<string>();
-    public Func<Settings, ToggleNode> EnableSelector { get; set; } = _ => null;
-}
-
-public class EntityPosWrapper
-{
-    public readonly Vector3 Pos;
-
-    public EntityPosWrapper(Vector3 pos)
-    {
-        Pos = pos;
-    }
-}
-
-public class Core : BaseSettingsPlugin<Settings>
-{
-    private static readonly List<ExpeditionMarkerIconDescription> _expeditionRelicWorldIcons = new()
-    {
-        new()
-        {
-            Icon = MapIconsIndex.LegionGeneric,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierLegionSplintersElite",
-                "ExpeditionRelicModifierEternalEmpireLegionElite",
-                "ExpeditionRelicModifierLegionSplintersChest",
-                "ExpeditionRelicModifierEternalEmpireLegionChest"
-            },
-            EnableSelector = s => s.ShowLegion
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardUniques,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionUniqueElite",
-                "ExpeditionRelicModifierLostMenUniqueElite",
-                "ExpeditionRelicModifierExpeditionUniqueChest",
-                "ExpeditionRelicModifierLostMenUniqueChest"
-            },
-            EnableSelector = s => s.ShowUniques
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardEssences,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierEssencesElite",
-                "ExpeditionRelicModifierLostMenEssenceElite",
-                "ExpeditionRelicModifierLostMenEssenceChest",
-                "ExpeditionRelicModifierEssencesChest"
-            },
-            EnableSelector = s => s.ShowEssences
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardGems,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierVaalGemsElite",
-                "ExpeditionRelicModifierExpeditionGemsElite",
-                "ExpeditionRelicModifierVaalGemsChest",
-                "ExpeditionRelicModifierExpeditionGemsChest"
-            },
-            EnableSelector = s => s.ShowGems
-        },
-        new()
-        {
-            Icon = MapIconsIndex.QuestItem,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionLogbookQuantityChest",
-                "ExpeditionRelicModifierExpeditionLogbookQuantityMonster"
-            },
-            EnableSelector = s => s.ShowLogbooks
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardJewellery,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionRareTrinketElite",
-                "ExpeditionRelicModifierExpeditionRareTrinketChest"
-            },
-            EnableSelector = s => s.ShowRares
-        },
-        new()
-        {
-            Icon = MapIconsIndex.LabyrinthEnchant,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierEternalEmpireEnchantElite",
-                "ExpeditionRelicModifierEternalEmpireEnchantChest"
-            },
-            EnableSelector = s => s.ShowEnchant
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardScarabs,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierSirensScarabElite",
-                "ExpeditionRelicModifierSirensScarabChest"
-            },
-            EnableSelector = s => s.ShowScarabs
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardBreach,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierBreachSplintersElite",
-                "ExpeditionRelicModifierSirensBreachElite",
-                "ExpeditionRelicModifierBreachSplintersChest",
-                "ExpeditionRelicModifierSirensBreachChest"
-            },
-            EnableSelector = s => s.ShowBreach
-        },
-        new()
-        {
-            Icon = MapIconsIndex.LootFilterLargeYellowStar,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionInfluencedItemsElite",
-                "ExpeditionRelicModifierExpeditionInfluencedItemsChest"
-            },
-            EnableSelector = s => s.ShowInfluencedItems
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardMaps,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionMapsElite",
-                "ExpeditionRelicModifierExpeditionMapsChest"
-            },
-            EnableSelector = s => s.ShowMaps
-        },
-        new()
-        {
-            Icon = MapIconsIndex.LootFilterLargeBlueDiamond,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionFracturedItemsElite",
-                "ExpeditionRelicModifierExpeditionFracturedItemsChest"
-            },
-            EnableSelector = s => s.ShowFractured
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardHarbinger,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierHarbingerCurrencyElite",
-                "ExpeditionRelicModifierHarbingerCurrencyChest"
-            },
-            EnableSelector = s => s.ShowHarbinger
-        },
-        new()
-        {
-            Icon = MapIconsIndex.LootFilterLargeGreenTriangle,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierPackSize",
-                "ExpeditionRelicModifierRareMonsterChance",
-                "ExpeditionRelicModifierElitesDuplicated"
-            },
-            EnableSelector = s => s.ShowMonsterMods
-        },
-        new()
-        {
-            Icon = MapIconsIndex.LootFilterLargePurpleSquare,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionCurrencyQuantityChest",
-                "ExpeditionRelicModifierExpeditionCurrencyQuantityMonster"
-            },
-            EnableSelector = s => s.ShowArtifacts
-        },
-        new()
-        {
-            Icon = MapIconsIndex.LootFilterLargePurpleCircle,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionVendorCurrency"
-            },
-            EnableSelector = s => s.ShowExpeditionRerollCurrency
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardGenericItems,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierItemQuantityChest",
-                "ExpeditionRelicModifierItemQuantityMonster"
-            },
-            EnableSelector = s => s.ShowItemQuantity
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardCurrency,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierExpeditionBasicCurrencyChest",
-                "ExpeditionRelicModifierExpeditionBasicCurrencyElite"
-            },
-            EnableSelector = s => s.ShowBasicCurrency
-        },
-        new()
-        {
-            Icon = MapIconsIndex.RewardDivinationCards,
-            BaseEntityMetadataSubstrings =
-            {
-                "ExpeditionRelicModifierStackedDeckChest",
-                "ExpeditionRelicModifierStackedDeckElite"
-            },
-            EnableSelector = s => s.ShowStackedDecks
-        },
-    };
-
     private const string TextureName = "Icons.png";
     private const double CameraAngle = 38.7 * Math.PI / 180;
     private static readonly float CameraAngleCos = (float)Math.Cos(CameraAngle);
@@ -249,18 +30,59 @@ public class Core : BaseSettingsPlugin<Settings>
     private readonly ConditionalWeakTable<Entity, EntityPosWrapper> _entityPos = new ConditionalWeakTable<Entity, EntityPosWrapper>();
     private Vector2 _playerPos;
     private float _playerZ;
+    private IntPtr _iconsImageId;
+    private readonly Dictionary<IconPickerIndex, bool> _iconPickerShown = new Dictionary<IconPickerIndex, bool>();
 
     private Camera Camera => GameController.Game.IngameState.Camera;
 
     public override bool Initialise()
     {
         Graphics.InitImage(TextureName);
-        return base.Initialise();
-    }
+        var goodModsDrawer = Drawers.FirstOrDefault(x => x.Name == "Good mods");
+        foreach (var expeditionMarkerIconDescription in Icons.ExpeditionRelicWorldIcons)
+        {
+            goodModsDrawer?.Children.Add(new SettingsHolder
+            {
+                Name = $"IconLine{expeditionMarkerIconDescription.IconPickerIndex}",
+                DrawDelegate =
+                    () =>
+                    {
+                        var defaultIcon = expeditionMarkerIconDescription.Icon;
+                        var iconKey = expeditionMarkerIconDescription.IconPickerIndex;
 
-    public override Job Tick()
-    {
-        return null;
+                        var oldSettings = Settings.IconMapping.GetValueOrDefault(iconKey, new IconDisplaySettings());
+                        var changed = false;
+                        changed |= ImGui.Checkbox($"Show {iconKey}", ref oldSettings.Show);
+                        ImGui.SameLine();
+                        var effectiveIcon = oldSettings.Icon ?? defaultIcon;
+                        var uv = SpriteHelper.GetUV(effectiveIcon);
+                        var uv0 = uv.TopLeft.ToVector2Num();
+                        var uv1 = uv.BottomRight.ToVector2Num();
+                        ImGui.PushID(iconKey.ToString());
+                        if (ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * 15, uv0, uv1) ||
+                            _iconPickerShown.GetValueOrDefault(iconKey))
+                        {
+                            _iconPickerShown.Clear();
+                            _iconPickerShown[iconKey] = true;
+                            if (PickIcon(iconKey.ToString(), ref effectiveIcon))
+                            {
+                                changed = true;
+                                oldSettings.Icon = effectiveIcon != defaultIcon ? effectiveIcon : null;
+                                _iconPickerShown[iconKey] = false;
+                            }
+                        }
+
+                        ImGui.PopID();
+
+                        if (changed)
+                        {
+                            Settings.IconMapping[iconKey] = oldSettings;
+                        }
+                    }
+            });
+        }
+
+        return base.Initialise();
     }
 
     private static TValue GetOrAdd<TKey, TValue>(ConditionalWeakTable<TKey, TValue> table, TKey key, Func<TKey, TValue> createFunc)
@@ -276,8 +98,44 @@ public class Core : BaseSettingsPlugin<Settings>
         return result;
     }
 
+    private void DrawCirclesInWorld(List<Vector3> positions, int radius, Color color)
+    {
+        const int segments = 90;
+        const int segmentSpan = 360 / segments;
+        foreach (var position in positions)
+        {
+            foreach (var segmentId in Enumerable.Range(0, segments))
+            {
+                (Vector2, Vector2) GetVector(int i)
+                {
+                    var p = position + new Vector3((float)(Math.Cos(Math.PI / 180 * i) * radius), (float)(Math.Sin(Math.PI / 180 * i) * radius), 0);
+                    var vector2 = Camera.WorldToScreen(p);
+                    return (new Vector2(p.X, p.Y), vector2);
+                }
+
+                var segmentOrigin = segmentId * segmentSpan;
+                var (w1, c1) = GetVector(segmentOrigin);
+                var (w2, c2) = GetVector(segmentOrigin + segmentSpan);
+                if (Settings.EnableExplosiveRadiusMerging)
+                {
+                    if (positions
+                        .Where(x => x != position)
+                        .Select(x => new Vector2(x.X, x.Y))
+                        .Any(x => Vector2.Distance(w1, x) < radius &&
+                                  Vector2.Distance(w2, x) < radius))
+                    {
+                        continue;
+                    }
+                }
+
+                ImGui.GetForegroundDrawList().AddLine(c1.ToVector2Num(), c2.ToVector2Num(), color.ToImgui());
+            }
+        }
+    }
+
     public override void Render()
     {
+        _iconsImageId = Graphics.GetTextureId("Icons.png");
         var ingameUi = GameController.Game.IngameState.IngameUi;
         var map = ingameUi.Map;
         var largeMap = map.LargeMap.AsObject<SubMap>();
@@ -288,6 +146,20 @@ public class Core : BaseSettingsPlugin<Settings>
         _playerZ = GameController.Player.GetComponent<Render>().Z;
 
         const string markerPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionMarker";
+        const string explosivePath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionExplosive";
+        if (Settings.ShowExplosives)
+        {
+            var explosives = GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
+                .Where(x => x.Path == explosivePath)
+                .Select(x => x.Pos)
+                .ToList();
+            DrawCirclesInWorld(explosives,
+                GameController.Area.CurrentArea.Area.RawName.StartsWith("Expedition")
+                    ? Settings.LogbookExplosiveRadius
+                    : Settings.MapExplosiveRadius.Value,
+                Settings.ExplosiveColor.Value);
+        }
+
         foreach (var e in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon].OrderBy(x => x.Path != markerPath))
         {
             if (e.Path == markerPath)
@@ -299,12 +171,12 @@ public class Core : BaseSettingsPlugin<Settings>
                     {
                         if (Settings.DrawEliteMonstersOnMap)
                         {
-                            DrawIconOnMap(e, MapIconsIndex.MissionTarget, Color.Blue, Vector2.Zero);
+                            DrawIconOnMap(e, MapIconsIndex.HeistSpottedMiniBoss, Color.White, Vector2.Zero);
                         }
 
                         if (Settings.DrawEliteMonstersInWorld)
                         {
-                            DrawIconInWorld(e, MapIconsIndex.MissionTarget, Color.Blue, Vector2.Zero);
+                            DrawIconInWorld(e, MapIconsIndex.HeistSpottedMiniBoss, Color.White, Vector2.Zero);
                         }
                     }
                     else
@@ -352,6 +224,7 @@ public class Core : BaseSettingsPlugin<Settings>
             var expeditionChestComponent = e.GetComponent<ObjectMagicProperties>();
             if (expeditionChestComponent == null) continue;
             var mods = expeditionChestComponent.Mods;
+            if (!e.TryGetComponent<MinimapIcon>(out var iconComponent) || iconComponent.IsHide) continue;
             if (!mods.Any(x => x.Contains("ExpeditionRelicModifier"))) continue;
 
             var icons = new List<MapIconsIndex>();
@@ -386,11 +259,15 @@ public class Core : BaseSettingsPlugin<Settings>
 
             if (Settings.DrawGoodModsInWorld || Settings.DrawGoodModsOnMap)
             {
-                foreach (var worldIcon in _expeditionRelicWorldIcons.Where(x => x.EnableSelector(Settings)?.Value ?? true))
+                foreach (var worldIcon in Icons.ExpeditionRelicWorldIcons)
                 {
-                    if (mods.Any(mod => worldIcon.BaseEntityMetadataSubstrings.Any(mod.Contains)))
+                    var settings = Settings.IconMapping.GetValueOrDefault(worldIcon.IconPickerIndex, new IconDisplaySettings());
+                    if (settings.Show)
                     {
-                        icons.Add(worldIcon.Icon);
+                        if (mods.Any(mod => worldIcon.BaseEntityMetadataSubstrings.Any(mod.Contains)))
+                        {
+                            icons.Add(settings.Icon ?? worldIcon.Icon);
+                        }
                     }
                 }
 
@@ -417,7 +294,7 @@ public class Core : BaseSettingsPlugin<Settings>
     {
         if (_largeMapOpen)
         {
-            const int halfsize = 15;
+            float halfsize = Settings.MapIconSize / 2.0f;
             var point = GetEntityPosOnMapScreen(entity) + offset * halfsize * 2;
             var rect = new RectangleF(point.X, point.Y, 0, 0);
             rect.Inflate(halfsize, halfsize);
@@ -427,7 +304,7 @@ public class Core : BaseSettingsPlugin<Settings>
 
     private void DrawIconInWorld(Entity entity, MapIconsIndex icon, Color color, Vector2 offset)
     {
-        const int halfsize = 25;
+        float halfsize = Settings.WorldIconSize / 2.0f;
         var entityPos = Settings.CacheEntityPosition ? GetOrAdd(_entityPos, entity, e => new EntityPosWrapper(e.Pos)).Pos : entity.Pos;
         var point = Camera.WorldToScreen(entityPos) + offset * halfsize * 2;
         var rect = new RectangleF(point.X, point.Y, 0, 0);
@@ -446,6 +323,58 @@ public class Core : BaseSettingsPlugin<Settings>
     {
         deltaZ /= GridToWorldMultiplier; //z is normally "world" units, translate to grid
         return (float)_mapScale * new Vector2((delta.X - delta.Y) * CameraAngleCos, (deltaZ - (delta.X + delta.Y)) * CameraAngleSin);
+    }
+
+    private bool PickIcon(string iconName, ref MapIconsIndex icon)
+    {
+        var isOpen = true;
+        ImGui.Begin($"Pick icon for {iconName}", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize);
+        if (!isOpen)
+        {
+            return true;
+        }
+
+        ImGui.SliderInt("Icon size (only in this menu)", ref Settings.IconPickerSize, 15, 60);
+        var icons = Enum.GetValues<MapIconsIndex>();
+        for (var i = 0; i < icons.Length; i++)
+        {
+            var testIcon = icons[i];
+            var rect = SpriteHelper.GetUV(testIcon);
+            var pushedStyle = icon == testIcon;
+            if (pushedStyle)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(1, 0, 1, 1));
+                ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 10);
+            }
+
+            ImGui.PushID(i.ToString());
+            try
+            {
+                if (ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * Settings.IconPickerSize,
+                        rect.TopLeft.ToVector2Num(), rect.BottomRight.ToVector2Num()))
+                {
+                    icon = testIcon;
+                    return true;
+                }
+            }
+            finally
+            {
+                ImGui.PopID();
+                if (pushedStyle)
+                {
+                    ImGui.PopStyleVar();
+                    ImGui.PopStyleColor();
+                }
+            }
+
+            if ((i + 1) % 15 != 0)
+            {
+                ImGui.SameLine();
+            }
+        }
+
+        ImGui.End();
+        return false;
     }
 }
 

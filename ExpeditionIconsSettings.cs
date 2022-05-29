@@ -1,17 +1,23 @@
-﻿using ExileCore.Shared.Attributes;
+﻿using System.Collections.Generic;
+using ExileCore.Shared.Attributes;
 using ExileCore.Shared.Interfaces;
 using ExileCore.Shared.Nodes;
+using SharpDX;
 
 namespace ExpeditionIcons
 {
-    public class Settings : ISettings
+    public class ExpeditionIconsSettings : ISettings
     {
+        public int IconPickerSize = 20;
+        public Dictionary<IconPickerIndex, IconDisplaySettings> IconMapping = new Dictionary<IconPickerIndex, IconDisplaySettings>();
         public ToggleNode Enable { get; set; } = new ToggleNode(false);
         public ToggleNode DrawEliteMonstersInWorld { get; set; } = new ToggleNode(true);
         public ToggleNode DrawEliteMonstersOnMap { get; set; } = new ToggleNode(true);
         public ToggleNode DrawChestsInWorld { get; set; } = new ToggleNode(true);
         public ToggleNode DrawChestsOnMap { get; set; } = new ToggleNode(true);
         public ToggleNode CacheEntityPosition { get; set; } = new ToggleNode(true);
+        public RangeNode<int> WorldIconSize { get; set; } = new RangeNode<int>(50, 25, 200);
+        public RangeNode<int> MapIconSize { get; set; } = new RangeNode<int>(30, 15, 200);
 
         [Menu("Good mods", 100)]
         public EmptyNode SettingsEmptyGood { get; set; }
@@ -21,63 +27,6 @@ namespace ExpeditionIcons
 
         [Menu(nameof(DrawGoodModsInWorld), parentIndex = 100)]
         public ToggleNode DrawGoodModsInWorld { get; set; } = new ToggleNode(true);
-
-        [Menu("Show monsters mods", parentIndex = 100)]
-        public ToggleNode ShowMonsterMods { get; set; } = new ToggleNode(true);
-
-        [Menu("Show logbook quantity", parentIndex = 100)]
-        public ToggleNode ShowLogbooks { get; set; } = new ToggleNode(true);
-
-        [Menu("Show artifact quantity", parentIndex = 100)]
-        public ToggleNode ShowArtifacts { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowExpeditionRerollCurrency), parentIndex = 100)]
-        public ToggleNode ShowExpeditionRerollCurrency { get; set; } = new ToggleNode(true);
-
-        [Menu("Show basic currency", parentIndex = 100)]
-        public ToggleNode ShowBasicCurrency { get; set; } = new ToggleNode(true);
-
-        [Menu("Show stacked decks", parentIndex = 100)]
-        public ToggleNode ShowStackedDecks { get; set; } = new ToggleNode(true);
-
-        [Menu("Show item quantity", parentIndex = 100)]
-        public ToggleNode ShowItemQuantity { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowLegion), parentIndex = 100)]
-        public ToggleNode ShowLegion { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowUniques), parentIndex = 100)]
-        public ToggleNode ShowUniques { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowEssences), parentIndex = 100)]
-        public ToggleNode ShowEssences { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowGems), parentIndex = 100)]
-        public ToggleNode ShowGems { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowRares), parentIndex = 100)]
-        public ToggleNode ShowRares { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowEnchant), parentIndex = 100)]
-        public ToggleNode ShowEnchant { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowScarabs), parentIndex = 100)]
-        public ToggleNode ShowScarabs { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowBreach), parentIndex = 100)]
-        public ToggleNode ShowBreach { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowInfluencedItems), parentIndex = 100)]
-        public ToggleNode ShowInfluencedItems { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowMaps), parentIndex = 100)]
-        public ToggleNode ShowMaps { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowFractured), parentIndex = 100)]
-        public ToggleNode ShowFractured { get; set; } = new ToggleNode(true);
-
-        [Menu(nameof(ShowHarbinger), parentIndex = 100)]
-        public ToggleNode ShowHarbinger { get; set; } = new ToggleNode(true);
 
         [Menu("Bad mods", 101)]
         public EmptyNode SettingsEmptyBad { get; set; }
@@ -129,5 +78,19 @@ namespace ExpeditionIcons
 
         [Menu("Warn for 20% cull", parentIndex = 101)]
         public ToggleNode WarnCull { get; set; } = new ToggleNode(true);
+
+
+        [Menu("Explosive settings", 102)]
+        public EmptyNode ExplosivesSettings { get; set; }
+        [Menu("Show explosive radius", parentIndex = 102)]
+        public ToggleNode ShowExplosives { get; set; } = new ToggleNode(true);
+        [Menu("Color for explosive radius", parentIndex = 102)]
+        public ColorNode ExplosiveColor { get; set; } = new ColorNode(Color.Red);
+        [Menu("Map Explosive radius", parentIndex = 102)]
+        public RangeNode<int> MapExplosiveRadius { get; set; } = new RangeNode<int>(310, 10, 600);
+        [Menu("Logbook Explosive radius", parentIndex = 102)]
+        public RangeNode<int> LogbookExplosiveRadius { get; set; } = new RangeNode<int>(310, 10, 600);
+        [Menu("Merge explosive radii", parentIndex = 102)]
+        public ToggleNode EnableExplosiveRadiusMerging { get; set; } = new ToggleNode(true);
     }
 }
