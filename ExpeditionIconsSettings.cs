@@ -88,8 +88,11 @@ namespace ExpeditionIcons
         public ColorNode ExplosiveColor { get; set; } = new ColorNode(Color.Red);
         [Menu("Map Explosive radius", parentIndex = 102)]
         public RangeNode<int> MapExplosiveRadius { get; set; } = new RangeNode<int>(310, 10, 600);
+
         [Menu("Logbook Explosive radius", parentIndex = 102)]
         public RangeNode<int> LogbookExplosiveRadius { get; set; } = new RangeNode<int>(310, 10, 600);
+        [Menu("Automatically calculate Radius from Mapmods", parentIndex = 102)]
+        public ToggleNode AutoCalculateRadius { get; set; } = new ToggleNode(true);
         [Menu("Merge explosive radii", parentIndex = 102)]
         public ToggleNode EnableExplosiveRadiusMerging { get; set; } = new ToggleNode(true);
     }

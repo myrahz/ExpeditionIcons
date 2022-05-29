@@ -22,7 +22,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     private static readonly float CameraAngleCos = (float)Math.Cos(CameraAngle);
     private static readonly float CameraAngleSin = (float)Math.Sin(CameraAngle);
     private const float GridToWorldMultiplier = 250 / 23f;
-
+    private const int ExplosiveBaseRadius = 310;
     private double _mapScale;
     private Vector2 _mapCenter;
     private bool _largeMapOpen;
@@ -153,11 +153,14 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                 .Where(x => x.Path == explosivePath)
                 .Select(x => x.Pos)
                 .ToList();
-            DrawCirclesInWorld(explosives,
-                GameController.Area.CurrentArea.Area.RawName.StartsWith("Expedition")
-                    ? Settings.LogbookExplosiveRadius
-                    : Settings.MapExplosiveRadius.Value,
-                Settings.ExplosiveColor.Value);
+            DrawCirclesInWorld(
+                positions: explosives,
+                radius: GameController.Area.CurrentArea.Area.RawName.StartsWith("Expedition") ? 
+                    Settings.AutoCalculateRadius && GameController.IngameState.Data.MapStats.ContainsKey(GameStat.MapExpeditionExplosionRadiusPct) ?
+                        (int)((float)ExplosiveBaseRadius * (1.0 + (float)GameController.IngameState.Data.MapStats[GameStat.MapExpeditionExplosionRadiusPct] / 100)) : Settings.LogbookExplosiveRadius.Value :
+                    Settings.AutoCalculateRadius && GameController.IngameState.Data.MapStats.ContainsKey(GameStat.MapExpeditionExplosionRadiusPct) ?
+                        (int)((float)ExplosiveBaseRadius * (1.0 + (float)GameController.IngameState.Data.MapStats[GameStat.MapExpeditionExplosionRadiusPct] / 100)) : Settings.MapExplosiveRadius.Value, 
+                color: Settings.ExplosiveColor.Value);
         }
 
         foreach (var e in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon].OrderBy(x => x.Path != markerPath))
