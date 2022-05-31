@@ -160,7 +160,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.RunicMonsterDuplication,
-            Icon = MapIconsIndex.ExpeditionBoss,
+            Icon = MapIconsIndex.IncursionArchitectReplace,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierElitesDuplicated"
