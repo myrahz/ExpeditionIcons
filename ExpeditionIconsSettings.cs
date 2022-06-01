@@ -100,5 +100,9 @@ namespace ExpeditionIcons
 
         [Menu("Mark entities captured by explosives", parentIndex = 102)]
         public ToggleNode MarkCapturedEntities { get; set; } = new ToggleNode(true);
+        [Menu("Color for marked entities", parentIndex = 102)]
+        public ColorNode MarkCapturedEntitiesColor { get; set; } = new ColorNode(Color.Green);
+        [Menu("Rectangle Thickness for marked entities", parentIndex = 102)]
+        public RangeNode<int> MarkCapturedEntitiesFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
     }
 }
