@@ -317,7 +317,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         rect.Inflate(halfsize, halfsize);
         if (Settings.MarkCapturedEntities && explosivePositions.Any(x => Vector2.Distance(x, entityPos2) < explosiveRadius))
         {
-            Graphics.DrawFrame(rect, Color.Green, 1);
+            Graphics.DrawFrame(rect, Settings.MarkCapturedEntitiesColor, Settings.MarkCapturedEntitiesFrameThickness);
         }
 
         Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color);
