@@ -11,7 +11,6 @@ using ExileCore.Shared.Helpers;
 using ImGuiNET;
 using SharpDX;
 using Vector2 = SharpDX.Vector2;
-using Vector4 = System.Numerics.Vector4;
 
 namespace ExpeditionIcons;
 
@@ -30,57 +29,12 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     private readonly ConditionalWeakTable<Entity, EntityPosWrapper> _entityPos = new ConditionalWeakTable<Entity, EntityPosWrapper>();
     private Vector2 _playerPos;
     private float _playerZ;
-    private IntPtr _iconsImageId;
-    private readonly Dictionary<IconPickerIndex, bool> _iconPickerShown = new Dictionary<IconPickerIndex, bool>();
 
     private Camera Camera => GameController.Game.IngameState.Camera;
 
     public override bool Initialise()
     {
         Graphics.InitImage(TextureName);
-        var goodModsDrawer = Drawers.FirstOrDefault(x => x.Name == "Good mods");
-        foreach (var expeditionMarkerIconDescription in Icons.ExpeditionRelicWorldIcons)
-        {
-            goodModsDrawer?.Children.Add(new SettingsHolder
-            {
-                Name = $"IconLine{expeditionMarkerIconDescription.IconPickerIndex}",
-                DrawDelegate =
-                    () =>
-                    {
-                        var defaultIcon = expeditionMarkerIconDescription.Icon;
-                        var iconKey = expeditionMarkerIconDescription.IconPickerIndex;
-
-                        var oldSettings = Settings.IconMapping.GetValueOrDefault(iconKey, new IconDisplaySettings());
-                        var changed = false;
-                        changed |= ImGui.Checkbox($"Show {iconKey}", ref oldSettings.Show);
-                        ImGui.SameLine();
-                        var effectiveIcon = oldSettings.Icon ?? defaultIcon;
-                        var uv = SpriteHelper.GetUV(effectiveIcon);
-                        var uv0 = uv.TopLeft.ToVector2Num();
-                        var uv1 = uv.BottomRight.ToVector2Num();
-                        ImGui.PushID(iconKey.ToString());
-                        if (ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * 15, uv0, uv1) ||
-                            _iconPickerShown.GetValueOrDefault(iconKey))
-                        {
-                            _iconPickerShown.Clear();
-                            _iconPickerShown[iconKey] = true;
-                            if (PickIcon(iconKey.ToString(), ref effectiveIcon))
-                            {
-                                changed = true;
-                                oldSettings.Icon = effectiveIcon != defaultIcon ? effectiveIcon : null;
-                                _iconPickerShown[iconKey] = false;
-                            }
-                        }
-
-                        ImGui.PopID();
-
-                        if (changed)
-                        {
-                            Settings.IconMapping[iconKey] = oldSettings;
-                        }
-                    }
-            });
-        }
 
         return base.Initialise();
     }
@@ -135,7 +89,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
     public override void Render()
     {
-        _iconsImageId = Graphics.GetTextureId("Icons.png");
+        Settings._iconsImageId = Graphics.GetTextureId("Icons.png");
         var ingameUi = GameController.Game.IngameState.IngameUi;
         var map = ingameUi.Map;
         var largeMap = map.LargeMap.AsObject<SubMap>();
@@ -147,6 +101,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
         const string markerPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionMarker";
         const string explosivePath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionExplosive";
+        const string relicPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionRelic";
         var explosiveRadius = Settings.AutoCalculateRadius
                                   //ReSharper disable once PossibleLossOfFraction
                                   //rounding here is extremely important to get right, this is taken from the game's code
@@ -167,129 +122,149 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
         foreach (var e in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon].OrderBy(x => x.Path != markerPath))
         {
-            if (e.Path == markerPath)
+            switch (e.Path)
             {
-                var animatedMetaData = GetOrAdd(_baseAnimatedEntityMetadata, e, ee => ee.GetComponent<Animated>()?.BaseAnimatedObjectEntity?.Metadata);
-                if (animatedMetaData != null)
+                case markerPath:
                 {
-                    if (animatedMetaData.Contains("elitemarker"))
+                    var animatedMetaData = GetOrAdd(_baseAnimatedEntityMetadata, e, ee => ee.GetComponent<Animated>()?.BaseAnimatedObjectEntity?.Metadata);
+                    if (animatedMetaData != null)
                     {
-                        if (Settings.DrawEliteMonstersOnMap)
+                        if (animatedMetaData.Contains("elitemarker"))
                         {
-                            DrawIconOnMap(e, MapIconsIndex.HeistSpottedMiniBoss, Color.White, Vector2.Zero);
-                        }
-
-                        if (Settings.DrawEliteMonstersInWorld)
-                        {
-                            DrawIconInWorld(e, MapIconsIndex.HeistSpottedMiniBoss, Color.White, Vector2.Zero, explosives2D, explosiveRadius);
-                        }
-                    }
-                    else
-                    {
-                        var color = Color.Transparent;
-                        var alreadyHasMapIcon = false;
-                        if (animatedMetaData.Contains("chestmarker3"))
-                        {
-                            color = Color.Orange;
-                        }
-                        else if (animatedMetaData.Contains("chestmarker2"))
-                        {
-                            color = Color.Yellow;
-                        }
-                        else if (animatedMetaData.Contains("chestmarker1") || animatedMetaData.Contains("chestmarker_signpost"))
-                        {
-                            color = Color.White;
-                        }
-                        else if (animatedMetaData.Contains("Metadata/Terrain/Doodads/Leagues/Expedition/ChestMarkers"))
-                        {
-                            color = Color.Red;
-                            alreadyHasMapIcon = true;
-                        }
-
-                        if (color != Color.Transparent)
-                        {
-                            if (!alreadyHasMapIcon && Settings.DrawChestsOnMap)
+                            var mapSettings = Settings.IconMapping.GetValueOrDefault(IconPickerIndex.EliteMonstersMapIndicator, new IconDisplaySettings());
+                            if (mapSettings.Show)
                             {
-                                DrawIconOnMap(e, MapIconsIndex.MissionAlly, color, Vector2.Zero);
+                                DrawIconOnMap(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultEliteMonsterIcon, Color.White, Vector2.Zero);
                             }
 
-                            if (Settings.DrawChestsInWorld)
+                            var worldSettings = Settings.IconMapping.GetValueOrDefault(IconPickerIndex.EliteMonstersWorldIndicator, new IconDisplaySettings());
+                            if (worldSettings.Show)
                             {
-                                DrawIconInWorld(e, MapIconsIndex.MissionAlly, color, Vector2.Zero, explosives2D, explosiveRadius);
+                                DrawIconInWorld(e, worldSettings.Icon ?? ExpeditionIconsSettings.DefaultEliteMonsterIcon, Color.White, Vector2.Zero, explosives2D, explosiveRadius);
+                            }
+                        }
+                        else
+                        {
+                            var color = Color.Transparent;
+                            var alreadyHasMapIcon = false;
+                            if (animatedMetaData.Contains("chestmarker3"))
+                            {
+                                color = Color.Orange;
+                            }
+                            else if (animatedMetaData.Contains("chestmarker2"))
+                            {
+                                color = Color.Yellow;
+                            }
+                            else if (animatedMetaData.Contains("chestmarker1") || animatedMetaData.Contains("chestmarker_signpost"))
+                            {
+                                color = Color.White;
+                            }
+                            else if (animatedMetaData.Contains("Metadata/Terrain/Doodads/Leagues/Expedition/ChestMarkers"))
+                            {
+                                color = Color.Red;
+                                alreadyHasMapIcon = true;
+                            }
+
+                            if (color != Color.Transparent)
+                            {
+                                if (!alreadyHasMapIcon && Settings.DrawChestsOnMap)
+                                {
+                                    DrawIconOnMap(e, MapIconsIndex.MissionAlly, color, Vector2.Zero);
+                                }
+
+                                if (Settings.DrawChestsInWorld)
+                                {
+                                    DrawIconInWorld(e, MapIconsIndex.MissionAlly, color, Vector2.Zero, explosives2D, explosiveRadius);
+                                }
                             }
                         }
                     }
+
+                    continue;
                 }
-
-                continue;
-            }
-
-            var renderComponent = e.GetComponent<Render>();
-            if (renderComponent == null) continue;
-            var expeditionChestComponent = e.GetComponent<ObjectMagicProperties>();
-            if (expeditionChestComponent == null) continue;
-            var mods = expeditionChestComponent.Mods;
-            if (!e.TryGetComponent<MinimapIcon>(out var iconComponent) || iconComponent.IsHide) continue;
-            if (!mods.Any(x => x.Contains("ExpeditionRelicModifier"))) continue;
-
-            var icons = new List<MapIconsIndex>();
-            if (Settings.PhysImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmunePhysicalDamage")) ||
-                Settings.FireImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneFireDamage")) ||
-                Settings.ColdImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneColdDamage")) ||
-                Settings.LightningImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneLightningDamage")) ||
-                Settings.ChaosImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneChaosDamage")) ||
-                Settings.CritImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeCrit")) ||
-                Settings.IgniteImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneStatusAilments")) ||
-                Settings.WarnArmorPen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierIgnoreArmour")) ||
-                Settings.WarnNoEvade.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierHitsCannotBeEvaded")) ||
-                Settings.WarnNoLeech.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeLeechedFrom")) ||
-                Settings.WarnNoFlask.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierGrantNoFlaskCharges")) ||
-                Settings.WarnPetrify.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesPetrifyOnHit")) ||
-                Settings.WarnCurseImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneToCurses")) ||
-                Settings.WarnCull.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCullingStrikeTwentyPercent"))
-               )
-            {
-                if (Settings.DrawBadModsInWorld)
+                case relicPath:
                 {
-                    DrawIconInWorld(e, MapIconsIndex.RedFlag, Color.White, -Vector2.UnitY, explosives2D, explosiveRadius);
-                }
+                    var renderComponent = e.GetComponent<Render>();
+                    if (renderComponent == null) continue;
+                    var expeditionChestComponent = e.GetComponent<ObjectMagicProperties>();
+                    if (expeditionChestComponent == null) continue;
+                    var mods = expeditionChestComponent.Mods;
+                    if (!e.TryGetComponent<MinimapIcon>(out var iconComponent) || iconComponent.IsHide) continue;
+                    if (!mods.Any(x => x.Contains("ExpeditionRelicModifier"))) continue;
 
-                if (Settings.DrawBadModsOnMap)
-                {
-                    DrawIconOnMap(e, MapIconsIndex.RedFlag, Color.White, Vector2.Zero);
-                }
-
-                continue;
-            }
-
-            if (Settings.DrawGoodModsInWorld || Settings.DrawGoodModsOnMap)
-            {
-                foreach (var worldIcon in Icons.ExpeditionRelicWorldIcons)
-                {
-                    var settings = Settings.IconMapping.GetValueOrDefault(worldIcon.IconPickerIndex, new IconDisplaySettings());
-                    if (settings.Show)
+                    var icons = new List<MapIconsIndex>();
+                    if (Settings.WarnPhysImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmunePhysicalDamage")) ||
+                        Settings.WarnFireImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneFireDamage")) ||
+                        Settings.WarnColdImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneColdDamage")) ||
+                        Settings.WarnLightningImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneLightningDamage")) ||
+                        Settings.WarnChaosImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneChaosDamage")) ||
+                        Settings.WarnCritImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeCrit")) ||
+                        Settings.WarnIgniteImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneStatusAilments")) ||
+                        Settings.WarnArmorPen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierIgnoreArmour")) ||
+                        Settings.WarnNoEvade.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierHitsCannotBeEvaded")) ||
+                        Settings.WarnNoLeech.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeLeechedFrom")) ||
+                        Settings.WarnNoFlask.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierGrantNoFlaskCharges")) ||
+                        Settings.WarnPetrify.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesPetrifyOnHit")) ||
+                        Settings.WarnCurseImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneToCurses")) ||
+                        Settings.WarnCull.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCullingStrikeTwentyPercent")) ||
+                        Settings.WarnMonsterBlock.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierAttackBlockSpellBlockMaxBlockChance")) ||
+                        Settings.WarnMonsterResist.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierResistancesAndMaxResistances")) ||
+                        Settings.WarnMonsterRegen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesRegenerateLifeEveryFourSeconds"))
+                       )
                     {
-                        if (mods.Any(mod => worldIcon.BaseEntityMetadataSubstrings.Any(mod.Contains)))
+
+                        var mapSettings = Settings.IconMapping.GetValueOrDefault(IconPickerIndex.BadModsMapIndicator, new IconDisplaySettings());
+                        if (mapSettings.Show)
                         {
-                            icons.Add(settings.Icon ?? worldIcon.Icon);
+                            DrawIconOnMap(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultBadModsIcon, Color.White, Vector2.Zero);
+                        }
+
+                        var worldSettings = Settings.IconMapping.GetValueOrDefault(IconPickerIndex.BadModsWorldIndicator, new IconDisplaySettings());
+                        if (worldSettings.Show)
+                        {
+                            DrawIconInWorld(e, worldSettings.Icon ?? ExpeditionIconsSettings.DefaultBadModsIcon, Color.White, -Vector2.UnitY, explosives2D, explosiveRadius);
+                        }
+
+                        continue;
+                    }
+
+                    if (Settings.DrawGoodModsInWorld || Settings.DrawGoodModsOnMap)
+                    {
+                        foreach (var worldIcon in Icons.ExpeditionRelicWorldIcons)
+                        {
+                            var settings = Settings.IconMapping.GetValueOrDefault(worldIcon.IconPickerIndex, new IconDisplaySettings());
+                            if (settings.Show)
+                            {
+                                if (mods.Any(mod => worldIcon.BaseEntityMetadataSubstrings.Any(mod.Contains)))
+                                {
+                                    icons.Add(settings.Icon ?? worldIcon.DefaultIcon);
+                                }
+                            }
+                        }
+
+                        var offset = new Vector2(-icons.Count * 0.5f + 0.5f, 0);
+                        foreach (var icon in icons)
+                        {
+                            if (Settings.DrawGoodModsInWorld)
+                            {
+                                DrawIconInWorld(e, icon, Color.White, offset, explosives2D, explosiveRadius);
+                            }
+
+                            if (Settings.DrawGoodModsOnMap)
+                            {
+                                DrawIconOnMap(e, icon, Color.White, offset);
+                            }
+
+                            offset += Vector2.UnitX;
                         }
                     }
+
+                    break;
                 }
-
-                var offset = new Vector2(-icons.Count * 0.5f + 0.5f, 0);
-                foreach (var icon in icons)
+                default:
                 {
-                    if (Settings.DrawGoodModsInWorld)
-                    {
-                        DrawIconInWorld(e, icon, Color.White, offset, explosives2D, explosiveRadius);
-                    }
-
-                    if (Settings.DrawGoodModsOnMap)
-                    {
-                        DrawIconOnMap(e, icon, Color.White, offset);
-                    }
-
-                    offset += Vector2.UnitX;
+                    LogMessage($"other entity: {e.Path}");
+                    break;
                 }
             }
         }
@@ -334,58 +309,6 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     {
         deltaZ /= GridToWorldMultiplier; //z is normally "world" units, translate to grid
         return (float)_mapScale * new Vector2((delta.X - delta.Y) * CameraAngleCos, (deltaZ - (delta.X + delta.Y)) * CameraAngleSin);
-    }
-
-    private bool PickIcon(string iconName, ref MapIconsIndex icon)
-    {
-        var isOpen = true;
-        ImGui.Begin($"Pick icon for {iconName}", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize);
-        if (!isOpen)
-        {
-            return true;
-        }
-
-        ImGui.SliderInt("Icon size (only in this menu)", ref Settings.IconPickerSize, 15, 60);
-        var icons = Enum.GetValues<MapIconsIndex>();
-        for (var i = 0; i < icons.Length; i++)
-        {
-            var testIcon = icons[i];
-            var rect = SpriteHelper.GetUV(testIcon);
-            var pushedStyle = icon == testIcon;
-            if (pushedStyle)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(1, 0, 1, 1));
-                ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 10);
-            }
-
-            ImGui.PushID(i.ToString());
-            try
-            {
-                if (ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * Settings.IconPickerSize,
-                        rect.TopLeft.ToVector2Num(), rect.BottomRight.ToVector2Num()))
-                {
-                    icon = testIcon;
-                    return true;
-                }
-            }
-            finally
-            {
-                ImGui.PopID();
-                if (pushedStyle)
-                {
-                    ImGui.PopStyleVar();
-                    ImGui.PopStyleColor();
-                }
-            }
-
-            if ((i + 1) % 15 != 0)
-            {
-                ImGui.SameLine();
-            }
-        }
-
-        ImGui.End();
-        return false;
     }
 }
 

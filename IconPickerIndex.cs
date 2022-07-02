@@ -26,4 +26,8 @@ public enum IconPickerIndex
     Currency,
     StackedDecks,
     RunicMonsterDuplication,
+    EliteMonstersWorldIndicator,
+    EliteMonstersMapIndicator,
+    BadModsWorldIndicator,
+    BadModsMapIndicator,
 }

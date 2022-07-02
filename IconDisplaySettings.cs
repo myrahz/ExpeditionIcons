@@ -12,5 +12,8 @@ public record struct IconDisplaySettings(MapIconsIndex? Icon = null, bool Show =
 
     [JsonConverter(typeof(StringEnumConverter))]
     public MapIconsIndex? Icon = Icon;
+
     public bool Show = Show;
+
+    public bool ShouldSerializeIcon() => Icon != null;
 }

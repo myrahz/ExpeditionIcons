@@ -10,7 +10,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Legion,
-            Icon = MapIconsIndex.LegionGeneric,
+            DefaultIcon = MapIconsIndex.LegionGeneric,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierLegionSplintersElite",
@@ -22,7 +22,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Uniques,
-            Icon = MapIconsIndex.RewardUniques,
+            DefaultIcon = MapIconsIndex.RewardUniques,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionUniqueElite",
@@ -34,7 +34,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Essences,
-            Icon = MapIconsIndex.RewardEssences,
+            DefaultIcon = MapIconsIndex.RewardEssences,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierEssencesElite",
@@ -46,7 +46,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.VaalGems,
-            Icon = MapIconsIndex.RewardGems,
+            DefaultIcon = MapIconsIndex.RewardGems,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierVaalGemsElite",
@@ -58,7 +58,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Logbooks,
-            Icon = MapIconsIndex.QuestItem,
+            DefaultIcon = MapIconsIndex.QuestItem,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionLogbookQuantityChest",
@@ -68,7 +68,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Jewellery,
-            Icon = MapIconsIndex.RewardJewellery,
+            DefaultIcon = MapIconsIndex.RewardJewellery,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionRareTrinketElite",
@@ -78,7 +78,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Enchants,
-            Icon = MapIconsIndex.LabyrinthEnchant,
+            DefaultIcon = MapIconsIndex.LabyrinthEnchant,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierEternalEmpireEnchantElite",
@@ -88,7 +88,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Scarabs,
-            Icon = MapIconsIndex.RewardScarabs,
+            DefaultIcon = MapIconsIndex.RewardScarabs,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierSirensScarabElite",
@@ -98,7 +98,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Breach,
-            Icon = MapIconsIndex.RewardBreach,
+            DefaultIcon = MapIconsIndex.RewardBreach,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierBreachSplintersElite",
@@ -110,7 +110,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Influenced,
-            Icon = MapIconsIndex.LootFilterLargeYellowCross,
+            DefaultIcon = MapIconsIndex.LootFilterLargeYellowCross,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionInfluencedItemsElite",
@@ -120,7 +120,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Maps,
-            Icon = MapIconsIndex.RewardMaps,
+            DefaultIcon = MapIconsIndex.RewardMaps,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionMapsElite",
@@ -130,7 +130,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Fractured,
-            Icon = MapIconsIndex.LootFilterLargeBlueDiamond,
+            DefaultIcon = MapIconsIndex.LootFilterLargeBlueDiamond,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionFracturedItemsElite",
@@ -140,7 +140,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Harbinger,
-            Icon = MapIconsIndex.RewardHarbinger,
+            DefaultIcon = MapIconsIndex.RewardHarbinger,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierHarbingerCurrencyElite",
@@ -150,7 +150,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.MonsterMods,
-            Icon = MapIconsIndex.LootFilterLargeGreenTriangle,
+            DefaultIcon = MapIconsIndex.LootFilterLargeGreenTriangle,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierPackSize",
@@ -160,7 +160,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.RunicMonsterDuplication,
-            Icon = MapIconsIndex.IncursionArchitectReplace,
+            DefaultIcon = MapIconsIndex.IncursionArchitectReplace,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierElitesDuplicated"
@@ -169,7 +169,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Artifacts,
-            Icon = MapIconsIndex.LootFilterLargePurpleSquare,
+            DefaultIcon = MapIconsIndex.LootFilterLargePurpleSquare,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionCurrencyQuantityChest",
@@ -179,7 +179,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Rerolls,
-            Icon = MapIconsIndex.LootFilterLargePurpleCircle,
+            DefaultIcon = MapIconsIndex.LootFilterLargePurpleCircle,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionVendorCurrency"
@@ -188,7 +188,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Quantity,
-            Icon = MapIconsIndex.RewardGenericItems,
+            DefaultIcon = MapIconsIndex.RewardGenericItems,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierItemQuantityChest",
@@ -198,7 +198,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.Currency,
-            Icon = MapIconsIndex.RewardCurrency,
+            DefaultIcon = MapIconsIndex.RewardCurrency,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierExpeditionBasicCurrencyChest",
@@ -208,7 +208,7 @@ public static class Icons
         new()
         {
             IconPickerIndex = IconPickerIndex.StackedDecks,
-            Icon = MapIconsIndex.RewardDivinationCards,
+            DefaultIcon = MapIconsIndex.RewardDivinationCards,
             BaseEntityMetadataSubstrings =
             {
                 "ExpeditionRelicModifierStackedDeckChest",
