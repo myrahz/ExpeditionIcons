@@ -261,11 +261,6 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
                     break;
                 }
-                default:
-                {
-                    LogMessage($"other entity: {e.Path}");
-                    break;
-                }
             }
         }
     }
