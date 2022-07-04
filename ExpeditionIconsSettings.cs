@@ -17,6 +17,7 @@ public class ExpeditionIconsSettings : ISettings
 {
     public const MapIconsIndex DefaultBadModsIcon = MapIconsIndex.RedFlag;
     public const MapIconsIndex DefaultEliteMonsterIcon = MapIconsIndex.HeistSpottedMiniBoss;
+    public const MapIconsIndex DefaultChestIcon = MapIconsIndex.MissionTarget;
 
     internal IntPtr _iconsImageId;
     private IconPickerIndex? _shownIconPicker;
@@ -31,7 +32,19 @@ public class ExpeditionIconsSettings : ISettings
         {
             DrawDelegate = () =>
             {
-                foreach (var expeditionMarkerIconDescription in Icons.ExpeditionRelicWorldIcons)
+                foreach (var expeditionMarkerIconDescription in Icons.ExpeditionRelicIcons)
+                {
+                    ImGui.PushID($"IconLine{expeditionMarkerIconDescription.IconPickerIndex}");
+                    PickIcon(expeditionMarkerIconDescription.IconPickerIndex, expeditionMarkerIconDescription.DefaultIcon);
+                    ImGui.PopID();
+                }
+            }
+        };
+        ChestSettings = new CustomNode
+        {
+            DrawDelegate = () =>
+            {
+                foreach (var expeditionMarkerIconDescription in Icons.LogbookChestIcons)
                 {
                     ImGui.PushID($"IconLine{expeditionMarkerIconDescription.IconPickerIndex}");
                     PickIcon(expeditionMarkerIconDescription.IconPickerIndex, expeditionMarkerIconDescription.DefaultIcon);
@@ -41,19 +54,11 @@ public class ExpeditionIconsSettings : ISettings
         };
         DrawEliteMonstersInWorld = new CustomNode
         {
-            DrawDelegate = () => { PickIcon(IconPickerIndex.EliteMonstersWorldIndicator, DefaultEliteMonsterIcon); }
+            DrawDelegate = () => { PickIcon(IconPickerIndex.EliteMonstersIndicator, DefaultEliteMonsterIcon); }
         };
-        DrawEliteMonstersOnMap = new CustomNode
+        DrawBadMods = new CustomNode
         {
-            DrawDelegate = () => { PickIcon(IconPickerIndex.EliteMonstersMapIndicator, DefaultEliteMonsterIcon); }
-        };
-        DrawBadModsInWorld = new CustomNode
-        {
-            DrawDelegate = () => { PickIcon(IconPickerIndex.BadModsWorldIndicator, DefaultBadModsIcon); }
-        };
-        DrawBadModsOnMap = new CustomNode
-        {
-            DrawDelegate = () => { PickIcon(IconPickerIndex.BadModsMapIndicator, DefaultBadModsIcon); }
+            DrawDelegate = () => { PickIcon(IconPickerIndex.BadModsIndicator, DefaultBadModsIcon); }
         };
     }
 
@@ -61,12 +66,6 @@ public class ExpeditionIconsSettings : ISettings
 
     [JsonIgnore]
     public CustomNode DrawEliteMonstersInWorld { get; set; }
-
-    [JsonIgnore]
-    public CustomNode DrawEliteMonstersOnMap { get; set; }
-
-    public ToggleNode DrawChestsInWorld { get; set; } = new ToggleNode(true);
-    public ToggleNode DrawChestsOnMap { get; set; } = new ToggleNode(true);
     public ToggleNode CacheEntityPosition { get; set; } = new ToggleNode(true);
     public RangeNode<int> WorldIconSize { get; set; } = new RangeNode<int>(50, 25, 200);
     public RangeNode<int> MapIconSize { get; set; } = new RangeNode<int>(30, 15, 200);
@@ -91,11 +90,7 @@ public class ExpeditionIconsSettings : ISettings
 
     [Menu(null, parentIndex = 101)]
     [JsonIgnore]
-    public CustomNode DrawBadModsOnMap { get; }
-
-    [Menu(null, parentIndex = 101)]
-    [JsonIgnore]
-    public CustomNode DrawBadModsInWorld { get; }
+    public CustomNode DrawBadMods { get; }
 
     [Menu("Warn for physical immune", parentIndex = 101)]
     public ToggleNode WarnPhysImmune { get; set; } = new ToggleNode(false);
@@ -148,6 +143,13 @@ public class ExpeditionIconsSettings : ISettings
     [Menu("Warn for monster resistances", parentIndex = 101)]
     public ToggleNode WarnMonsterResist { get; set; } = new ToggleNode(false);
 
+    [Menu("Chest settings", index = 103)]
+    [JsonIgnore]
+    public EmptyNode ChestSettingsHeader { get; set; }
+
+    [Menu(null, parentIndex = 103)]
+    [JsonIgnore]
+    public CustomNode ChestSettings { get; set; }
 
     [Menu("Explosive settings", 102)]
     [JsonIgnore]
@@ -177,7 +179,7 @@ public class ExpeditionIconsSettings : ISettings
     [Menu("Rectangle Thickness for marked entities", parentIndex = 102)]
     public RangeNode<int> MarkCapturedEntitiesFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
 
-    private bool PickIcon(string iconName, ref MapIconsIndex icon)
+    private bool PickIcon(string iconName, ref MapIconsIndex icon, Vector4 tintColor)
     {
         var isOpen = true;
         ImGui.Begin($"Pick icon for {iconName}", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize);
@@ -209,7 +211,7 @@ public class ExpeditionIconsSettings : ISettings
             try
             {
                 if (ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * IconPickerSize,
-                        rect.TopLeft.ToVector2Num(), rect.BottomRight.ToVector2Num()))
+                        rect.TopLeft.ToVector2Num(), rect.BottomRight.ToVector2Num(), -1, Vector4.Zero, tintColor))
                 {
                     icon = testIcon;
                     return true;
@@ -234,14 +236,33 @@ public class ExpeditionIconsSettings : ISettings
     private void PickIcon(IconPickerIndex iconKey, MapIconsIndex defaultIcon)
     {
         var iconSettings = IconMapping.GetValueOrDefault(iconKey, new IconDisplaySettings());
-        ImGui.Checkbox($"Show {iconKey}", ref iconSettings.Show);
+        ImGui.Checkbox($"Show {iconKey} on map", ref iconSettings.ShowOnMap);
+        ImGui.SameLine();
+        ImGui.Text("(");
+        ImGui.SameLine(0, 0);
+        ImGui.Checkbox("in world", ref iconSettings.ShowInWorld);
+        ImGui.SameLine(0, 0);
+        ImGui.Text(")");
         ImGui.SameLine();
         var effectiveIcon = iconSettings.Icon ?? defaultIcon;
         var uv = SpriteHelper.GetUV(effectiveIcon);
         var uv0 = uv.TopLeft.ToVector2Num();
         var uv1 = uv.BottomRight.ToVector2Num();
         ImGui.PushID(iconKey.ToString());
-        var buttonClicked = ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * 15, uv0, uv1);
+        var tintVector = (iconSettings.Tint ?? Color.White).ToImguiVec4();
+        var buttonClicked = ImGui.ImageButton(_iconsImageId, System.Numerics.Vector2.One * 15, uv0, uv1, -1, Vector4.Zero, tintVector);
+        ImGui.SameLine();
+        if (ImGui.ColorEdit4("Tint", ref tintVector,
+                ImGuiColorEditFlags.AlphaBar | ImGuiColorEditFlags.NoInputs |
+                ImGuiColorEditFlags.AlphaPreviewHalf))
+        {
+            var tint = tintVector.ToSharpColor();
+            if (tint != Color.White)
+            {
+                iconSettings.Tint = tint;
+            }
+        }
+
         if (buttonClicked)
         {
             _iconFilter = "";
@@ -250,7 +271,7 @@ public class ExpeditionIconsSettings : ISettings
         if (buttonClicked || iconKey == _shownIconPicker)
         {
             _shownIconPicker = iconKey;
-            if (PickIcon(iconKey.ToString(), ref effectiveIcon))
+            if (PickIcon(iconKey.ToString(), ref effectiveIcon, tintVector))
             {
                 iconSettings.Icon = effectiveIcon != defaultIcon ? effectiveIcon : null;
                 _shownIconPicker = null;

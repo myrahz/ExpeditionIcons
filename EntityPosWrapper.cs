@@ -2,12 +2,4 @@
 
 namespace ExpeditionIcons;
 
-public class EntityPosWrapper
-{
-    public readonly Vector3 Pos;
-
-    public EntityPosWrapper(Vector3 pos)
-    {
-        Pos = pos;
-    }
-}
+public record EntityPosWrapper(Vector3 Pos, Vector2 GridPos, float RenderZ);
