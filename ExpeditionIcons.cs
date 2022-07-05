@@ -32,6 +32,8 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     private float _playerZ;
     private readonly ConcurrentDictionary<string, List<ExpeditionMarkerIconDescription>> _relicModIconMapping = new();
     private readonly ConcurrentDictionary<string, ExpeditionMarkerIconDescription> _metadataIconMapping = new();
+    private List<Vector2> _explosives2DPositions;
+    private float _explosiveRadius;
 
     private Camera Camera => GameController.Game.IngameState.Camera;
 
@@ -73,7 +75,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                 var segmentOrigin = segmentId * segmentSpan;
                 var (w1, c1) = GetVector(segmentOrigin);
                 var (w2, c2) = GetVector(segmentOrigin + segmentSpan);
-                if (Settings.EnableExplosiveRadiusMerging)
+                if (Settings.ExplosivesSettings.EnableExplosiveRadiusMerging)
                 {
                     if (positions
                         .Where(x => x != position)
@@ -105,22 +107,22 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         const string markerPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionMarker";
         const string explosivePath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionExplosive";
         const string relicPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionRelic";
-        var explosiveRadius = Settings.AutoCalculateRadius
+        _explosiveRadius = Settings.ExplosivesSettings.AutoCalculateRadius
                                   //ReSharper disable once PossibleLossOfFraction
                                   //rounding here is extremely important to get right, this is taken from the game's code
                                   ? ExplosiveBaseRadius * (100 + GameController.IngameState.Data.MapStats.GetValueOrDefault(GameStat.MapExpeditionExplosionRadiusPct)) / 100 * GridToWorldMultiplier
-                                  : Settings.ExplosiveRadius.Value;
-        var explosives = GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
+                                  : Settings.ExplosivesSettings.ExplosiveRadius.Value;
+        var explosives3D = GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
            .Where(x => x.Path == explosivePath)
            .Select(x => x.Pos)
            .ToList();
-        var explosives2D = explosives.Select(x => new Vector2(x.X, x.Y)).ToList();
-        if (Settings.ShowExplosives)
+        _explosives2DPositions = explosives3D.Select(x => new Vector2(x.X, x.Y)).ToList();
+        if (Settings.ExplosivesSettings.ShowExplosives)
         {
             DrawCirclesInWorld(
-                positions: explosives,
-                radius: explosiveRadius,
-                color: Settings.ExplosiveColor.Value);
+                positions: explosives3D,
+                radius: _explosiveRadius,
+                color: Settings.ExplosivesSettings.ExplosiveColor.Value);
         }
 
         foreach (var e in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon].OrderBy(x => x.Path != markerPath))
@@ -142,8 +144,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                             
                             if (mapSettings.ShowInWorld)
                             {
-                                DrawIconInWorld(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultEliteMonsterIcon, mapSettings.Tint, Vector2.Zero, explosives2D,
-                                    explosiveRadius);
+                                DrawIconInWorld(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultEliteMonsterIcon, mapSettings.Tint, Vector2.Zero);
                             }
                         }
                         else
@@ -163,7 +164,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
                                 if (settings.ShowInWorld)
                                 {
-                                    DrawIconInWorld(e, icon, settings.Tint, Vector2.Zero, explosives2D, explosiveRadius);
+                                    DrawIconInWorld(e, icon, settings.Tint, Vector2.Zero);
                                 }
                             }
                         }
@@ -209,7 +210,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                         
                         if (mapSettings.ShowInWorld)
                         {
-                            DrawIconInWorld(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultBadModsIcon, mapSettings.Tint, -Vector2.UnitY, explosives2D, explosiveRadius);
+                            DrawIconInWorld(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultBadModsIcon, mapSettings.Tint, -Vector2.UnitY);
                         }
 
                         continue;
@@ -243,7 +244,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                         {
                             if (Settings.DrawGoodModsInWorld)
                             {
-                                DrawIconInWorld(e, icon, tint, offset, explosives2D, explosiveRadius);
+                                DrawIconInWorld(e, icon, tint, offset);
                             }
 
                             offset += Vector2.UnitX;
@@ -275,11 +276,27 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
             var point = GetEntityPosOnMapScreen(entity) + offset * halfsize * 2;
             var rect = new RectangleF(point.X, point.Y, 0, 0);
             rect.Inflate(halfsize, halfsize);
-            Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color ?? Color.White);
+            var isInExplosiveRadius = false;
+            if (Settings.ExplosivesSettings.HideCapturedEntitiesOnMap || Settings.ExplosivesSettings.MarkCapturedEntitiesOnMap)
+            {
+                var entityPos = GetEntityInfo(entity).Pos;
+                var entityPos2 = new Vector2(entityPos.X, entityPos.Y);
+                isInExplosiveRadius = _explosives2DPositions.Any(x => Vector2.Distance(x, entityPos2) < _explosiveRadius);
+            }
+
+            if (isInExplosiveRadius && Settings.ExplosivesSettings.MarkCapturedEntitiesOnMap)
+            {
+                Graphics.DrawFrame(rect, Settings.ExplosivesSettings.CapturedEntityMapFrameColor, Settings.ExplosivesSettings.CapturedEntityMapFrameThickness);
+            }
+
+            if (!isInExplosiveRadius || !Settings.ExplosivesSettings.HideCapturedEntitiesOnMap)
+            {
+                Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color ?? Color.White);
+            }
         }
     }
 
-    private void DrawIconInWorld(Entity entity, MapIconsIndex icon, Color? color, Vector2 offset, List<Vector2> explosivePositions, float explosiveRadius)
+    private void DrawIconInWorld(Entity entity, MapIconsIndex icon, Color? color, Vector2 offset)
     {
         float halfsize = Settings.WorldIconSize / 2.0f;
         var entityPos = GetEntityInfo(entity).Pos;
@@ -287,12 +304,19 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         var point = Camera.WorldToScreen(entityPos) + offset * halfsize * 2;
         var rect = new RectangleF(point.X, point.Y, 0, 0);
         rect.Inflate(halfsize, halfsize);
-        if (Settings.MarkCapturedEntities && explosivePositions.Any(x => Vector2.Distance(x, entityPos2) < explosiveRadius))
+        var isInExplosiveRadius =
+            (Settings.ExplosivesSettings.HideCapturedEntitiesInWorld || Settings.ExplosivesSettings.MarkCapturedEntitiesInWorld) &&
+            _explosives2DPositions.Any(x => Vector2.Distance(x, entityPos2) < _explosiveRadius);
+
+        if (isInExplosiveRadius && Settings.ExplosivesSettings.MarkCapturedEntitiesInWorld)
         {
-            Graphics.DrawFrame(rect, Settings.MarkCapturedEntitiesColor, Settings.MarkCapturedEntitiesFrameThickness);
+            Graphics.DrawFrame(rect, Settings.ExplosivesSettings.CapturedEntityWorldFrameColor, Settings.ExplosivesSettings.CapturedEntityWorldFrameThickness);
         }
 
-        Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color ?? Color.White);
+        if (!isInExplosiveRadius || !Settings.ExplosivesSettings.HideCapturedEntitiesInWorld)
+        {
+            Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color ?? Color.White);
+        }
     }
 
     private Vector2 GetEntityPosOnMapScreen(Entity entity)

@@ -66,6 +66,7 @@ public class ExpeditionIconsSettings : ISettings
 
     [JsonIgnore]
     public CustomNode DrawEliteMonstersInWorld { get; set; }
+
     public ToggleNode CacheEntityPosition { get; set; } = new ToggleNode(true);
     public RangeNode<int> WorldIconSize { get; set; } = new RangeNode<int>(50, 25, 200);
     public RangeNode<int> MapIconSize { get; set; } = new RangeNode<int>(30, 15, 200);
@@ -151,33 +152,7 @@ public class ExpeditionIconsSettings : ISettings
     [JsonIgnore]
     public CustomNode ChestSettings { get; set; }
 
-    [Menu("Explosive settings", 102)]
-    [JsonIgnore]
-    public EmptyNode ExplosivesSettings { get; set; }
-
-    [Menu("Show explosive radius", parentIndex = 102)]
-    public ToggleNode ShowExplosives { get; set; } = new ToggleNode(true);
-
-    [Menu("Color for explosive radius", parentIndex = 102)]
-    public ColorNode ExplosiveColor { get; set; } = new ColorNode(Color.Red);
-
-    [Menu("Explosive radius", parentIndex = 102)]
-    public RangeNode<int> ExplosiveRadius { get; set; } = new RangeNode<int>(326, 10, 600);
-
-    [Menu("Automatically calculate Radius from Mapmods", parentIndex = 102)]
-    public ToggleNode AutoCalculateRadius { get; set; } = new ToggleNode(true);
-
-    [Menu("Merge explosive radii", parentIndex = 102)]
-    public ToggleNode EnableExplosiveRadiusMerging { get; set; } = new ToggleNode(true);
-
-    [Menu("Mark entities captured by explosives", parentIndex = 102)]
-    public ToggleNode MarkCapturedEntities { get; set; } = new ToggleNode(true);
-
-    [Menu("Color for marked entities", parentIndex = 102)]
-    public ColorNode MarkCapturedEntitiesColor { get; set; } = new ColorNode(Color.Green);
-
-    [Menu("Rectangle Thickness for marked entities", parentIndex = 102)]
-    public RangeNode<int> MarkCapturedEntitiesFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
+    public ExpeditionExplosiveSettings ExplosivesSettings { get; set; } = new ExpeditionExplosiveSettings();
 
     private bool PickIcon(string iconName, ref MapIconsIndex icon, Vector4 tintColor)
     {
@@ -281,4 +256,47 @@ public class ExpeditionIconsSettings : ISettings
         ImGui.PopID();
         IconMapping[iconKey] = iconSettings;
     }
+}
+
+[Submenu]
+public class ExpeditionExplosiveSettings
+{
+    [Menu("Show explosive radius")]
+    public ToggleNode ShowExplosives { get; set; } = new ToggleNode(true);
+
+    [Menu("Color for explosive radius")]
+    public ColorNode ExplosiveColor { get; set; } = new ColorNode(Color.Red);
+
+    [Menu("Explosive radius")]
+    public RangeNode<int> ExplosiveRadius { get; set; } = new RangeNode<int>(326, 10, 600);
+
+    [Menu("Automatically calculate Radius from Mapmods")]
+    public ToggleNode AutoCalculateRadius { get; set; } = new ToggleNode(true);
+
+    [Menu("Merge explosive radii")]
+    public ToggleNode EnableExplosiveRadiusMerging { get; set; } = new ToggleNode(true);
+
+    [Menu("Mark entities captured by explosives in world")]
+    public ToggleNode MarkCapturedEntitiesInWorld { get; set; } = new ToggleNode(true);
+
+    [Menu("Mark entities captured by explosives on map")]
+    public ToggleNode MarkCapturedEntitiesOnMap { get; set; } = new ToggleNode(true);
+
+    [Menu("Hide icons of entities captured by explosives in world")]
+    public ToggleNode HideCapturedEntitiesInWorld { get; set; } = new ToggleNode(false);
+
+    [Menu("Hide icons of entities captured by explosives on map")]
+    public ToggleNode HideCapturedEntitiesOnMap { get; set; } = new ToggleNode(false);
+
+    [Menu("Color for captured entities in world")]
+    public ColorNode CapturedEntityWorldFrameColor { get; set; } = new ColorNode(Color.Green);
+
+    [Menu("Color for captured entities on map")]
+    public ColorNode CapturedEntityMapFrameColor { get; set; } = new ColorNode(Color.Green);
+
+    [Menu("Rectangle Thickness for captured entities in world")]
+    public RangeNode<int> CapturedEntityWorldFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
+
+    [Menu("Rectangle Thickness for captured entities on map")]
+    public RangeNode<int> CapturedEntityMapFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
 }
