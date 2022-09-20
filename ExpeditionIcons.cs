@@ -110,7 +110,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         _explosiveRadius = Settings.ExplosivesSettings.AutoCalculateRadius
                                   //ReSharper disable once PossibleLossOfFraction
                                   //rounding here is extremely important to get right, this is taken from the game's code
-                                  ? ExplosiveBaseRadius * (100 + GameController.IngameState.Data.MapStats.GetValueOrDefault(GameStat.MapExpeditionExplosionRadiusPct)) / 100 * GridToWorldMultiplier
+                                  ? ExplosiveBaseRadius * (100 + GameController.IngameState.Data.MapStats?.GetValueOrDefault(GameStat.MapExpeditionExplosionRadiusPct) ?? 0) / 100 * GridToWorldMultiplier
                                   : Settings.ExplosivesSettings.ExplosiveRadius.Value;
         var explosives3D = GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
            .Where(x => x.Path == explosivePath)
