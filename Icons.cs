@@ -5,6 +5,33 @@ namespace ExpeditionIcons;
 
 public static class Icons
 {
+    public static IExpeditionRelic GetRelicType(string relicMod)
+    {
+        return relicMod switch
+        {
+            "ExpeditionRelicModifierExpeditionLogbookQuantityChest" => new LogbookChestRelic(),
+            "ExpeditionRelicModifierExpeditionLogbookQuantityMonster" => new LogbookMonsterRelic(),
+            "ExpeditionRelicModifierSirensScarabElite" => new OtherGoodMonsterRelic(),
+            "ExpeditionRelicModifierSirensScarabChest" => new OtherGoodChestRelic(),
+            "ExpeditionRelicModifierExpeditionFracturedItemsElite" => new FracturedMonsterRelic(),
+            "ExpeditionRelicModifierExpeditionFracturedItemsChest" => new FracturedChestRelic(),
+            "ExpeditionRelicModifierPackSize" => new PackSizeMonsterRelic(),
+            "ExpeditionRelicModifierElitesDuplicated" => new DoubledMonstersRelic(),
+            "ExpeditionRelicModifierExpeditionCurrencyQuantityChest" => new IncreasedChestArtifactsRelic(),
+            "ExpeditionRelicModifierExpeditionCurrencyQuantityMonster" => new IncreasedMonsterArtifactsRelic(),
+            "ExpeditionRelicModifierExpeditionVendorCurrency" => new OtherGoodChestRelic(),
+            "ExpeditionRelicModifierItemQuantityChest" => new IncreasedChestLootRelic(),
+            "ExpeditionRelicModifierItemQuantityMonster" => new IncreasedMonsterLootRelic(),
+            "ExpeditionRelicModifierExpeditionBasicCurrencyChest" => new OtherGoodChestRelic(),
+            "ExpeditionRelicModifierExpeditionBasicCurrencyElite" => new OtherGoodMonsterRelic(),
+            "ExpeditionRelicModifierStackedDeckChest" => new OtherGoodChestRelic(),
+            "ExpeditionRelicModifierStackedDeckElite" => new OtherGoodMonsterRelic(),
+            _ when relicMod.Contains("Monster") => new OtherMonsterRelic(),
+            _ when relicMod.Contains("Chest") => new OtherChestRelic(),
+            _ => null,
+        };
+    }
+
     public static readonly List<ExpeditionMarkerIconDescription> ExpeditionRelicIcons = new()
     {
         new()

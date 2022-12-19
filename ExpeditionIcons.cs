@@ -2,74 +2,141 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
+using System.Threading;
 using ExileCore;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.Elements;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
+using ExileCore.Shared.Nodes;
 using ImGuiNET;
 using SharpDX;
-using Vector2 = SharpDX.Vector2;
+using Vector2 = System.Numerics.Vector2;
+using Vector3 = System.Numerics.Vector3;
 
 namespace ExpeditionIcons;
 
 public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 {
+    private const string MarkerPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionMarker";
+    private const string ExplosivePath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionExplosive";
+    private const string RelicPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionRelic";
+
     private const string TextureName = "Icons.png";
     private const double CameraAngle = 38.7 * Math.PI / 180;
     private static readonly float CameraAngleCos = (float)Math.Cos(CameraAngle);
     private static readonly float CameraAngleSin = (float)Math.Sin(CameraAngle);
+
     private const float GridToWorldMultiplier = 250 / 23f;
+
+    //TODO
+    private const int ExplosiveBaseRange = 87;
     private const int ExplosiveBaseRadius = 30;
+
+    private readonly ConcurrentDictionary<string, List<ExpeditionMarkerIconDescription>> _relicModIconMapping = new();
+    private readonly ConcurrentDictionary<string, ExpeditionMarkerIconDescription> _metadataIconMapping = new();
+    private readonly Dictionary<uint, EntityCacheItem> _cachedEntities = new Dictionary<uint, EntityCacheItem>();
     private double _mapScale;
     private Vector2 _mapCenter;
     private bool _largeMapOpen;
-    private readonly ConditionalWeakTable<Entity, string> _baseAnimatedEntityMetadata = new ConditionalWeakTable<Entity, string>();
-    private readonly ConditionalWeakTable<Entity, EntityPosWrapper> _entityPos = new ConditionalWeakTable<Entity, EntityPosWrapper>();
-    private Vector2 _playerPos;
+    private Vector2 _playerGridPos;
     private float _playerZ;
-    private readonly ConcurrentDictionary<string, List<ExpeditionMarkerIconDescription>> _relicModIconMapping = new();
-    private readonly ConcurrentDictionary<string, ExpeditionMarkerIconDescription> _metadataIconMapping = new();
     private List<Vector2> _explosives2DPositions;
     private float _explosiveRadius;
+    private float _explosiveRange;
+    private PathPlannerRunner _plannerRunner;
+    private Vector2? _detonatorPos;
+    private bool _zoneCleared;
 
     private Camera Camera => GameController.Game.IngameState.Camera;
+
+    private Vector2? DetonatorPos => _detonatorPos ??= RealDetonatorPos;
+
+    private Vector2? RealDetonatorPos => DetonatorEntity is { } e
+            ? e.GridPosNum
+            : null;
+
+    private Entity DetonatorEntity =>
+        GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
+            .FirstOrDefault(x => x.Path == "Metadata/MiscellaneousObjects/Expedition/ExpeditionDetonator");
 
     public override bool Initialise()
     {
         Graphics.InitImage(TextureName);
         Settings._iconsImageId = Graphics.GetTextureId(TextureName);
+        Settings.PlannerSettings.StartSearch.OnPressed += StartSearch;
+        Settings.PlannerSettings.StopSearch.OnPressed += StopSearch;
+        Settings.PlannerSettings.ClearSearch.OnPressed += ClearSearch;
+        RegisterHotkey(Settings.PlannerSettings.StartSearchHotkey);
+        RegisterHotkey(Settings.PlannerSettings.StopSearchHotkey);
+        RegisterHotkey(Settings.PlannerSettings.ClearSearchHotkey);
         return base.Initialise();
     }
 
-    private static TValue GetOrAdd<TKey, TValue>(ConditionalWeakTable<TKey, TValue> table, TKey key, Func<TKey, TValue> createFunc)
-        where TKey : class
-        where TValue : class
+    private static void RegisterHotkey(HotkeyNode hotkey)
     {
-        if (!table.TryGetValue(key, out var result))
-        {
-            result = createFunc(key);
-            table.Add(key, result);
-        }
+        Input.RegisterKey(hotkey);
+        hotkey.OnValueChanged += () => { Input.RegisterKey(hotkey); };
+    }
 
-        return result;
+    private void StopSearch()
+    {
+        if (_plannerRunner is { } run)
+        {
+            run.Stop();
+            Settings.PlannerSettings.SearchState = SearchState.Stopped;
+        }
+        else
+        {
+            Settings.PlannerSettings.SearchState = SearchState.Empty;
+        }
+    }
+
+    private void StartSearch()
+    {
+        _plannerRunner?.Stop();
+        _plannerRunner = new PathPlannerRunner();
+        _plannerRunner.Start(Settings.PlannerSettings, BuildEnvironment());
+        Settings.PlannerSettings.SearchState = SearchState.Searching;
+    }
+
+    private void ClearSearch()
+    {
+        if (_plannerRunner is { } run)
+        {
+            run.Stop();
+            _plannerRunner = null;
+        }
+    }
+
+    public override void AreaChange(AreaInstance area)
+    {
+        _plannerRunner?.Stop();
+        _plannerRunner = null;
+        _detonatorPos = null;
+        _cachedEntities.Clear();
+        _zoneCleared = false;
     }
 
     private void DrawCirclesInWorld(List<Vector3> positions, float radius, Color color)
     {
         const int segments = 90;
         const int segmentSpan = 360 / segments;
-        foreach (var position in positions)
+        var playerPos = GameController.Player.GetComponent<Positioned>().WorldPosNum;
+        foreach (var position in positions
+                     .Where(x => playerPos.Distance(new Vector2(x.X, x.Y)) < 80 * GridToWorldMultiplier + radius))
         {
             foreach (var segmentId in Enumerable.Range(0, segments))
             {
                 (Vector2, Vector2) GetVector(int i)
                 {
-                    var p = position + new Vector3((float)(Math.Cos(Math.PI / 180 * i) * radius), (float)(Math.Sin(Math.PI / 180 * i) * radius), 0);
-                    var vector2 = Camera.WorldToScreen(p);
-                    return (new Vector2(p.X, p.Y), vector2);
+                    var (sin, cos) = MathF.SinCos(MathF.PI / 180 * i);
+                    var offset = new Vector2(cos, sin) * radius;
+                    var xy = position.Xy() + offset;
+                    var z = GameController.IngameState.Data.GetTerrainHeightAt(xy.WorldToGrid());
+                    var screen = Camera.WorldToScreen(new Vector3(xy, z));
+                    return (xy, screen);
                 }
 
                 var segmentOrigin = segmentId * segmentSpan;
@@ -87,35 +154,173 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                     }
                 }
 
-                ImGui.GetForegroundDrawList().AddLine(c1.ToVector2Num(), c2.ToVector2Num(), color.ToImgui());
+                ImGui.GetForegroundDrawList().AddLine(c1, c2, color.ToImgui());
             }
         }
     }
 
-    public override void Render()
+    public override Job Tick()
     {
         Settings._iconsImageId = Graphics.GetTextureId(TextureName);
+        Settings.PlannerSettings.SearchState = _plannerRunner switch
+        {
+            { IsRunning: true } => SearchState.Searching,
+            { IsRunning: false, CurrentBestPath.Count: > 0 } => SearchState.Stopped,
+            _ => SearchState.Empty
+        };
+        var detonatorPos = DetonatorPos;
+        _playerGridPos = GameController.Player.GetComponent<Positioned>().WorldPosNum.WorldToGrid();
+        if (detonatorPos is { } dp && _playerGridPos.Distance(dp) < 90 && DetonatorEntity?.IsTargetable != true)
+        {
+            ClearSearch();
+            _zoneCleared = true;
+            return null;
+        }
+        else
+        {
+            _zoneCleared = false;
+        }
+
         var ingameUi = GameController.Game.IngameState.IngameUi;
         var map = ingameUi.Map;
         var largeMap = map.LargeMap.AsObject<SubMap>();
         _largeMapOpen = largeMap.IsVisible;
         _mapScale = GameController.IngameState.Camera.Height / 677f * largeMap.Zoom;
-        _mapCenter = largeMap.GetClientRect().TopLeft + largeMap.Shift + largeMap.DefaultShift;
-        _playerPos = GameController.Player.GetComponent<Positioned>().GridPos;
+        _mapCenter = largeMap.GetClientRect().TopLeft.ToVector2Num() + largeMap.ShiftNum + largeMap.DefaultShiftNum;
         _playerZ = GameController.Player.GetComponent<Render>().Z;
 
-        const string markerPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionMarker";
-        const string explosivePath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionExplosive";
-        const string relicPath = "Metadata/MiscellaneousObjects/Expedition/ExpeditionRelic";
-        _explosiveRadius = Settings.ExplosivesSettings.AutoCalculateRadius
-                                  //ReSharper disable once PossibleLossOfFraction
-                                  //rounding here is extremely important to get right, this is taken from the game's code
-                                  ? ExplosiveBaseRadius * (100 + GameController.IngameState.Data.MapStats?.GetValueOrDefault(GameStat.MapExpeditionExplosionRadiusPct) ?? 0) / 100 * GridToWorldMultiplier
-                                  : Settings.ExplosivesSettings.ExplosiveRadius.Value;
+        _explosiveRadius = Settings.ExplosivesSettings.CalculateRadiusAutomatically
+            //ReSharper disable once PossibleLossOfFraction
+            //rounding here is extremely important to get right, this is taken from the game's code
+            ? ExplosiveBaseRadius * (100 + GameController.IngameState.Data.MapStats?.GetValueOrDefault(GameStat.MapExpeditionExplosionRadiusPct) ?? 0) / 100 * GridToWorldMultiplier
+            : Settings.ExplosivesSettings.ExplosiveRadius.Value;
+        //ReSharper disable once PossibleLossOfFraction
+        //rounding here is extremely important to get right, this is taken from the game's code
+        _explosiveRange = ExplosiveBaseRange * (100 + GameController.IngameState.Data.MapStats?.GetValueOrDefault(GameStat.MapExpeditionMaximumPlacementDistancePct) ?? 0) / 100 *
+                          GridToWorldMultiplier;
+
+        foreach (var entity in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon])
+        {
+            if (entity.Path is MarkerPath or RelicPath)
+            {
+                if (_cachedEntities.TryGetValue(entity.Id, out var oldValue))
+                {
+                    _cachedEntities[entity.Id] = oldValue.Merge(BuildCacheItem(entity));
+                }
+                else
+                {
+                    _cachedEntities[entity.Id] = BuildCacheItem(entity);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private ExpeditionEnvironment BuildEnvironment()
+    {
+        if (DetonatorPos is not { } detonatorPos)
+        {
+            throw new Exception("Unable to plan a path: detonator position is unknown");
+        }
+
+        var loot = new List<(Vector2, IExpeditionLoot)>();
+        var relics = new List<(Vector2, IExpeditionRelic)>();
+        foreach (var e in _cachedEntities.Values)
+        {
+            switch (e.Path)
+            {
+                case MarkerPath:
+                {
+                    var animatedMetaData = e.BaseAnimatedEntityMetadata;
+                    if (animatedMetaData != null)
+                    {
+                        if (animatedMetaData.Contains("elitemarker"))
+                        {
+                            loot.Add((e.GridPos, new RunicMonster()));
+                        }
+                        else
+                        {
+                            var iconDescription = _metadataIconMapping.GetOrAdd(animatedMetaData,
+                                a => Icons.LogbookChestIcons.FirstOrDefault(icon =>
+                                    icon.BaseEntityMetadataSubstrings.Any(a.Contains)));
+                            if (iconDescription != null)
+                            {
+                                loot.Add((e.GridPos, new OtherChest()));
+                            }
+                        }
+                    }
+
+                    continue;
+                }
+                case RelicPath:
+                {
+                    var mods = e.Mods;
+                    if (mods == null)
+                    {
+                        continue;
+                    }
+
+                    if (e.MinimapIconHide != false) continue;
+                    if (!mods.Any(x => x.Contains("ExpeditionRelicModifier"))) continue;
+
+                    if (ContainsWarnMods(mods))
+                    {
+                        relics.Add((e.GridPos, new WarningRelic()));
+                        continue;
+                    }
+
+                    var iconDescriptions = mods.SelectMany(mod =>
+                        _relicModIconMapping.GetOrAdd(mod, s =>
+                            Icons.ExpeditionRelicIcons.Where(icon =>
+                                icon.BaseEntityMetadataSubstrings.Any(s.Contains)).ToList())).Distinct();
+                    var allSubStrings = iconDescriptions.SelectMany(d => d.BaseEntityMetadataSubstrings).ToList();
+                    var fittingMods = mods
+                        .SelectMany(mod => allSubStrings.Where(mod.Contains))
+                        .Distinct()
+                        .Select(Icons.GetRelicType);
+                    relics.AddRange(fittingMods.Select(expeditionRelic => (e.GridPos, expeditionRelic)));
+
+                    break;
+                }
+            }
+        }
+
+        return new ExpeditionEnvironment(
+            relics.FindAll(x => x.Item2 != null),
+            loot.FindAll(x => x.Item2 != null),
+            _explosiveRange / GridToWorldMultiplier,
+            _explosiveRadius / GridToWorldMultiplier,
+            GameController.IngameState.IngameUi.ExpeditionDetonatorElement.RemainingExplosives,
+            detonatorPos);
+    }
+
+    public override void Render()
+    {
+        if (Settings.PlannerSettings.ClearSearchHotkey.PressedOnce())
+        {
+            ClearSearch();
+        }
+
+        if (Settings.PlannerSettings.StopSearchHotkey.PressedOnce())
+        {
+            StopSearch();
+        }
+
+        if (_zoneCleared)
+        {
+            return;
+        }
+
+        if (Settings.PlannerSettings.StartSearchHotkey.PressedOnce())
+        {
+            StartSearch();
+        }
+
         var explosives3D = GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
-           .Where(x => x.Path == explosivePath)
-           .Select(x => x.Pos)
-           .ToList();
+            .Where(x => x.Path == ExplosivePath)
+            .Select(x => x.PosNum)
+            .ToList();
         _explosives2DPositions = explosives3D.Select(x => new Vector2(x.X, x.Y)).ToList();
         if (Settings.ExplosivesSettings.ShowExplosives)
         {
@@ -125,13 +330,13 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                 color: Settings.ExplosivesSettings.ExplosiveColor.Value);
         }
 
-        foreach (var e in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon].OrderBy(x => x.Path != markerPath))
+        foreach (var e in _cachedEntities.Values)
         {
             switch (e.Path)
             {
-                case markerPath:
+                case MarkerPath:
                 {
-                    var animatedMetaData = GetOrAdd(_baseAnimatedEntityMetadata, e, ee => ee.GetComponent<Animated>()?.BaseAnimatedObjectEntity?.Metadata);
+                    var animatedMetaData = e.BaseAnimatedEntityMetadata;
                     if (animatedMetaData != null)
                     {
                         if (animatedMetaData.Contains("elitemarker"))
@@ -141,7 +346,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                             {
                                 DrawIconOnMap(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultEliteMonsterIcon, mapSettings.Tint, Vector2.Zero);
                             }
-                            
+
                             if (mapSettings.ShowInWorld)
                             {
                                 DrawIconInWorld(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultEliteMonsterIcon, mapSettings.Tint, Vector2.Zero);
@@ -172,42 +377,21 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
                     continue;
                 }
-                case relicPath:
+                case RelicPath:
                 {
-                    var renderComponent = e.GetComponent<Render>();
-                    if (renderComponent == null) continue;
-                    var expeditionChestComponent = e.GetComponent<ObjectMagicProperties>();
-                    if (expeditionChestComponent == null) continue;
-                    var mods = expeditionChestComponent.Mods;
-                    if (!e.TryGetComponent<MinimapIcon>(out var iconComponent) || iconComponent.IsHide) continue;
+                    var mods = e.Mods;
+                    if (e.Mods == null) continue;
+                    if (e.MinimapIconHide != false) continue;
                     if (!mods.Any(x => x.Contains("ExpeditionRelicModifier"))) continue;
 
-                    if (Settings.WarnPhysImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmunePhysicalDamage")) ||
-                        Settings.WarnFireImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneFireDamage")) ||
-                        Settings.WarnColdImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneColdDamage")) ||
-                        Settings.WarnLightningImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneLightningDamage")) ||
-                        Settings.WarnChaosImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneChaosDamage")) ||
-                        Settings.WarnCritImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeCrit")) ||
-                        Settings.WarnIgniteImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneStatusAilments")) ||
-                        Settings.WarnArmorPen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierIgnoreArmour")) ||
-                        Settings.WarnNoEvade.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierHitsCannotBeEvaded")) ||
-                        Settings.WarnNoLeech.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeLeechedFrom")) ||
-                        Settings.WarnNoFlask.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierGrantNoFlaskCharges")) ||
-                        Settings.WarnPetrify.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesPetrifyOnHit")) ||
-                        Settings.WarnCurseImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneToCurses")) ||
-                        Settings.WarnCull.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCullingStrikeTwentyPercent")) ||
-                        Settings.WarnMonsterBlock.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierAttackBlockSpellBlockMaxBlockChance")) ||
-                        Settings.WarnMonsterResist.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierResistancesAndMaxResistances")) ||
-                        Settings.WarnMonsterRegen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesRegenerateLifeEveryFourSeconds"))
-                       )
+                    if (ContainsWarnMods(mods))
                     {
-
                         var mapSettings = Settings.IconMapping.GetValueOrDefault(IconPickerIndex.BadModsIndicator, new IconDisplaySettings());
                         if (mapSettings.ShowOnMap)
                         {
                             DrawIconOnMap(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultBadModsIcon, mapSettings.Tint, Vector2.Zero);
                         }
-                        
+
                         if (mapSettings.ShowInWorld)
                         {
                             DrawIconInWorld(e, mapSettings.Icon ?? ExpeditionIconsSettings.DefaultBadModsIcon, mapSettings.Tint, -Vector2.UnitY);
@@ -266,63 +450,146 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                 }
             }
         }
+
+        if (_plannerRunner?.CurrentBestPath is { Count: > 0 } path)
+        {
+            var firstPoint = DetonatorPos ?? _playerGridPos;
+            var prevPoint = firstPoint;
+            for (var i = 0; i < path.Count; i++)
+            {
+                var point = path[i];
+                if (_largeMapOpen)
+                {
+                    Graphics.DrawLine(GetMapScreenPosition(prevPoint), GetMapScreenPosition(point), 1, Settings.PlannerSettings.MapLineColor);
+                }
+
+                var worldPos = GetWorldScreenPosition(point);
+                Graphics.DrawLine(GetWorldScreenPosition(prevPoint), worldPos, 1, Settings.PlannerSettings.WorldLineColor);
+                var text = $"#{i}";
+                Graphics.DrawBox(worldPos, worldPos + Graphics.MeasureText(text), Color.Black);
+                Graphics.DrawText(text, worldPos, Color.White);
+                prevPoint = point;
+            }
+
+            DrawCirclesInWorld(
+                positions: path.Select(p => new Vector3(p.GridToWorld(), GameController.IngameState.Data.GetTerrainHeightAt(p))).ToList(),
+                radius: _explosiveRadius,
+                color: Settings.PlannerSettings.ExplosiveColor.Value);
+        }
     }
 
-    private void DrawIconOnMap(Entity entity, MapIconsIndex icon, Color? color, Vector2 offset)
+    private bool ContainsWarnMods(List<string> mods)
+    {
+        return Settings.WarnPhysImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmunePhysicalDamage")) ||
+               Settings.WarnFireImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneFireDamage")) ||
+               Settings.WarnColdImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneColdDamage")) ||
+               Settings.WarnLightningImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneLightningDamage")) ||
+               Settings.WarnChaosImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneChaosDamage")) ||
+               Settings.WarnCritImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeCrit")) ||
+               Settings.WarnIgniteImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneStatusAilments")) ||
+               Settings.WarnArmorPen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierIgnoreArmour")) ||
+               Settings.WarnNoEvade.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierHitsCannotBeEvaded")) ||
+               Settings.WarnNoLeech.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCannotBeLeechedFrom")) ||
+               Settings.WarnNoFlask.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierGrantNoFlaskCharges")) ||
+               Settings.WarnPetrify.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesPetrifyOnHit")) ||
+               Settings.WarnCurseImmune.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierImmuneToCurses")) ||
+               Settings.WarnCull.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierCullingStrikeTwentyPercent")) ||
+               Settings.WarnMonsterBlock.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierAttackBlockSpellBlockMaxBlockChance")) ||
+               Settings.WarnMonsterResist.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierResistancesAndMaxResistances")) ||
+               Settings.WarnMonsterRegen.Value && mods.Any(x => x.Contains("ExpeditionRelicModifierElitesRegenerateLifeEveryFourSeconds"));
+    }
+
+    private void DrawIconOnMap(EntityCacheItem entity, MapIconsIndex icon, Color? color, Vector2 offset)
     {
         if (_largeMapOpen)
         {
-            float halfsize = Settings.MapIconSize / 2.0f;
+            var halfsize = Settings.MapIconSize / 2.0f;
             var point = GetEntityPosOnMapScreen(entity) + offset * halfsize * 2;
-            var rect = new RectangleF(point.X, point.Y, 0, 0);
-            rect.Inflate(halfsize, halfsize);
-            var isInExplosiveRadius = false;
-            if (Settings.ExplosivesSettings.HideCapturedEntitiesOnMap || Settings.ExplosivesSettings.MarkCapturedEntitiesOnMap)
-            {
-                var entityPos = GetEntityInfo(entity).Pos;
-                var entityPos2 = new Vector2(entityPos.X, entityPos.Y);
-                isInExplosiveRadius = _explosives2DPositions.Any(x => Vector2.Distance(x, entityPos2) < _explosiveRadius);
-            }
+            var entityPos = entity.Pos;
+            var entityPos2 = new Vector2(entityPos.X, entityPos.Y);
 
-            if (isInExplosiveRadius && Settings.ExplosivesSettings.MarkCapturedEntitiesOnMap)
-            {
-                Graphics.DrawFrame(rect, Settings.ExplosivesSettings.CapturedEntityMapFrameColor, Settings.ExplosivesSettings.CapturedEntityMapFrameThickness);
-            }
-
-            if (!isInExplosiveRadius || !Settings.ExplosivesSettings.HideCapturedEntitiesOnMap)
-            {
-                Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color ?? Color.White);
-            }
+            DrawIcon(icon, color, point, entityPos2,
+                Settings.ExplosivesSettings.HideCapturedEntitiesOnMap,
+                Settings.ExplosivesSettings.MarkCapturedEntitiesOnMap,
+                Settings.ExplosivesSettings.CapturedEntityMapFrameColor,
+                Settings.PlannerSettings.CapturedEntityMapFrameColor,
+                Settings.ExplosivesSettings.CapturedEntityMapFrameThickness,
+                Settings.MapIconSize);
         }
     }
 
-    private void DrawIconInWorld(Entity entity, MapIconsIndex icon, Color? color, Vector2 offset)
+    private void DrawIconInWorld(EntityCacheItem entity, MapIconsIndex icon, Color? color, Vector2 offset)
     {
-        float halfsize = Settings.WorldIconSize / 2.0f;
-        var entityPos = GetEntityInfo(entity).Pos;
+        var halfsize = Settings.WorldIconSize / 2.0f;
+        var entityPos = entity.Pos;
         var entityPos2 = new Vector2(entityPos.X, entityPos.Y);
         var point = Camera.WorldToScreen(entityPos) + offset * halfsize * 2;
-        var rect = new RectangleF(point.X, point.Y, 0, 0);
-        rect.Inflate(halfsize, halfsize);
-        var isInExplosiveRadius =
-            (Settings.ExplosivesSettings.HideCapturedEntitiesInWorld || Settings.ExplosivesSettings.MarkCapturedEntitiesInWorld) &&
-            _explosives2DPositions.Any(x => Vector2.Distance(x, entityPos2) < _explosiveRadius);
+        DrawIcon(icon, color, point, entityPos2,
+            Settings.ExplosivesSettings.HideCapturedEntitiesInWorld,
+            Settings.ExplosivesSettings.MarkCapturedEntitiesInWorld,
+            Settings.ExplosivesSettings.CapturedEntityWorldFrameColor,
+            Settings.PlannerSettings.CapturedEntityWorldFrameColor,
+            Settings.ExplosivesSettings.CapturedEntityWorldFrameThickness,
+            Settings.WorldIconSize);
+    }
 
-        if (isInExplosiveRadius && Settings.ExplosivesSettings.MarkCapturedEntitiesInWorld)
+    private void DrawIcon(
+        MapIconsIndex icon,
+        Color? color,
+        Vector2 displayPosition,
+        Vector2 worldPosition,
+        bool hideCaptured,
+        bool markCaptured,
+        Color capturedFrameColor,
+        Color plannerCapturedFrameColor,
+        int frameThickness,
+        float iconSize)
+    {
+        var halfsize = iconSize / 2.0f;
+        var rect = new RectangleF(displayPosition.X, displayPosition.Y, 0, 0);
+        rect.Inflate(halfsize, halfsize);
+        var calculateExplosiveFrameDisplay = hideCaptured || markCaptured;
+        var isInExplosiveRadius = calculateExplosiveFrameDisplay &&
+                                  _explosives2DPositions.Any(x => Vector2.Distance(x, worldPosition) < _explosiveRadius);
+        var gridPosition = worldPosition.WorldToGrid();
+        var isInPlannedExplosiveRadius = calculateExplosiveFrameDisplay &&
+                                         _plannerRunner?.CurrentBestPath is { Count: > 0 } path &&
+                                         path.Any(x => Vector2.Distance(x, gridPosition) < _explosiveRadius / GridToWorldMultiplier);
+
+        if (markCaptured)
         {
-            Graphics.DrawFrame(rect, Settings.ExplosivesSettings.CapturedEntityWorldFrameColor, Settings.ExplosivesSettings.CapturedEntityWorldFrameThickness);
+            var plannedRect = rect;
+            if (isInExplosiveRadius)
+            {
+                Graphics.DrawFrame(rect, capturedFrameColor, frameThickness);
+                plannedRect.Inflate(frameThickness, frameThickness);
+            }
+
+            if (isInPlannedExplosiveRadius)
+            {
+                Graphics.DrawFrame(plannedRect, plannerCapturedFrameColor, frameThickness);
+            }
         }
 
-        if (!isInExplosiveRadius || !Settings.ExplosivesSettings.HideCapturedEntitiesInWorld)
+        if (!isInExplosiveRadius || !hideCaptured)
         {
             Graphics.DrawImage(TextureName, rect, SpriteHelper.GetUV(icon), color ?? Color.White);
         }
     }
 
-    private Vector2 GetEntityPosOnMapScreen(Entity entity)
+    private Vector2 GetMapScreenPosition(Vector2 gridPos)
     {
-        var (_, gridPos, iconZ) = GetEntityInfo(entity);
-        var point = _mapCenter + TranslateGridDeltaToMapDelta(gridPos - _playerPos, iconZ - _playerZ);
+        return _mapCenter + TranslateGridDeltaToMapDelta(gridPos - _playerGridPos, GameController.IngameState.Data.GetTerrainHeightAt(gridPos) - _playerZ);
+    }
+
+    private Vector2 GetWorldScreenPosition(Vector2 gridPos)
+    {
+        return Camera.WorldToScreen(new Vector3(gridPos.GridToWorld(), GameController.IngameState.Data.GetTerrainHeightAt(gridPos)));
+    }
+
+    private Vector2 GetEntityPosOnMapScreen(EntityCacheItem entity)
+    {
+        var point = _mapCenter + TranslateGridDeltaToMapDelta(entity.GridPos - _playerGridPos, (entity.RenderZ ?? 0) - _playerZ);
         return point;
     }
 
@@ -332,34 +599,42 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         return (float)_mapScale * new Vector2((delta.X - delta.Y) * CameraAngleCos, (deltaZ - (delta.X + delta.Y)) * CameraAngleSin);
     }
 
-    private EntityPosWrapper GetEntityInfo(Entity entity)
+    private record EntityCacheItem(string Path, Lazy<string> BaseAnimatedEntityMetadataCache, List<string> Mods, Vector3 Pos, Vector2 GridPos, float? RenderZ,
+        bool? MinimapIconHide)
     {
-        return Settings.CacheEntityPosition
-                   ? GetOrAdd(_entityPos, entity, e => new EntityPosWrapper(e.Pos, e.GridPos, e.GetComponent<Render>()?.Z ?? 0))
-                   : new EntityPosWrapper(entity.Pos, entity.GridPos, entity.GetComponent<Render>()?.Z ?? 0);
+        public string BaseAnimatedEntityMetadata => BaseAnimatedEntityMetadataCache.Value;
+
+        public EntityCacheItem Merge(EntityCacheItem other)
+        {
+            return new EntityCacheItem(
+                Path ?? other.Path,
+                BaseAnimatedEntityMetadata == null ? other.BaseAnimatedEntityMetadataCache : BaseAnimatedEntityMetadataCache,
+                Mods ?? other.Mods,
+                Pos,
+                GridPos,
+                RenderZ ?? other.RenderZ,
+                MinimapIconHide ?? MinimapIconHide);
+        }
+    }
+
+
+    public override void EntityAdded(Entity entity)
+    {
+        if (entity.Type == EntityType.IngameIcon && entity.Path is MarkerPath or RelicPath)
+        {
+            _cachedEntities[entity.Id] = BuildCacheItem(entity);
+        }
+    }
+
+    private static EntityCacheItem BuildCacheItem(Entity entity)
+    {
+        return new EntityCacheItem(
+            entity.Path,
+            new Lazy<string>(() => entity.GetComponent<Animated>()?.BaseAnimatedObjectEntity?.Metadata, LazyThreadSafetyMode.None),
+            entity.GetComponent<ObjectMagicProperties>()?.Mods,
+            entity.PosNum,
+            entity.PosNum.WorldToGrid(),
+            entity.GetComponent<Render>()?.Z,
+            entity.GetComponent<MinimapIcon>()?.IsHide);
     }
 }
-
-
-//ExpeditionRelicModifierImmuneChaosDamage
-//ExpeditionRelicModifierImmuneColdDamage
-//ExpeditionRelicModifierImmuneFireDamage
-//ExpeditionRelicModifierImmuneLightningDamage
-//ExpeditionRelicModifierImmunePhysicalDamage
-//ExpeditionRelicModifierImmuneStatusAilments
-//ExpeditionRelicModifierImmuneToCurses
-//ExpeditionRelicModifierCannotBeCrit
-
-
-//ExpeditionRelicModifierElitesDuplicated
-//ExpeditionRelicModifierStackedDeckChest
-//ExpeditionRelicModifierStackedDeckElite
-//ExpeditionRelicModifierExpeditionBasicCurrencyChest
-//ExpeditionRelicModifierExpeditionBasicCurrencyElite
-//ExpeditionRelicModifierExpeditionLogbookQuantityChest
-//ExpeditionRelicModifierExpeditionLogbookQuantityMonster
-//ExpeditionRelicModifierExpeditionCurrencyQuantityChest
-//ExpeditionRelicModifierExpeditionCurrencyQuantityMonster
-//ExpeditionRelicModifierItemQuantityChest
-//ExpeditionRelicModifierItemQuantityMonster
-// Modifier:ExpeditionChestImplicitRarity~~, Modifier:ExpeditionLogbookMapExpeditionChestDoubleDropsChance~, Modifier:ExpeditionLogbookMapExpeditionExplosionRadius, Modifier:ExpeditionLogbookMapExpeditionExplosives, Modifier:ExpeditionLogbookMapExpeditionExtraRelicSuffixChance~~, Modifier:ExpeditionLogbookMapExpeditionMaximumPlacementDistance, Modifier:ExpeditionLogbookMapExpeditionNumberOfMonsterMarkers~, Modifier:ExpeditionLogbookMapExpeditionRelics, Modifier:ExpeditionLogbookMapExpeditionSagaAdditionalTerrainFeatures~~, Modifier:ExpeditionLogbookMapExpeditionSagaContainsBoss2~, Modifier:ExpeditionLogbookMapExpeditionSagaContainsBoss3, Modifier:ExpeditionLogbookMapExpeditionSagaContainsBoss4, Modifier:ExpeditionLogbookMapExpeditionSagaContainsBoss~, Modifier:ExpeditionNPCLifeRegen~, Modifier:ExpeditionNPCStealth~, Modifier:ExpeditionReducedBeyondPortalChance, Modifier:ExpeditionRelicModifierAcrobatic~~, Modifier:ExpeditionRelicModifierAllDamageFreezesFreezeDuration, Modifier:ExpeditionRelicModifierAllDamageIgnitesIgniteDuration, Modifier:ExpeditionRelicModifierAllDamagePoisonsPoisonDuration, Modifier:ExpeditionRelicModifierAllDamageShocksShockEffect, Modifier:ExpeditionRelicModifierAlwaysCrit, Modifier:ExpeditionRelicModifierAttackBlockSpellBlockMaxBlockChance, Modifier:ExpeditionRelicModifierAtziriFragmentsChest, Modifier:ExpeditionRelicModifierAtziriFragmentsElite~, Modifier:ExpeditionRelicModifierBleedOnHitBleedDuration, Modifier:ExpeditionRelicModifierBlightOilsChest, Modifier:ExpeditionRelicModifierBlightOilsElite, Modifier:ExpeditionRelicModifierBreachSplintersChest~, Modifier:ExpeditionRelicModifierBreachSplintersElite ~~ ~~, Modifier:ExpeditionRelicModifierCannotBeCrit, Modifier:ExpeditionRelicModifierCannotBeLeechedFrom~~, Modifier:ExpeditionRelicModifierChaosPenetration~, Modifier:ExpeditionRelicModifierColdPenetration, Modifier:ExpeditionRelicModifierCriticalAgainstFullLife, Modifier:ExpeditionRelicModifierCullingStrikeTwentyPercent, Modifier:ExpeditionRelicModifierDamage, Modifier:ExpeditionRelicModifierDamageAddedAsChaos, Modifier:ExpeditionRelicModifierDamageAttackCastMovementSpeedLowLife ~~ ~~, Modifier:ExpeditionRelicModifierDeliriumSplintersChest, Modifier:ExpeditionRelicModifierDeliriumSplintersElite, Modifier:ExpeditionRelicModifierElitesDeathGeasOnHit, Modifier:ExpeditionRelicModifierElitesDuplicated, Modifier:ExpeditionRelicModifierElitesPetrifyOnHit, Modifier:ExpeditionRelicModifierElitesRandomCurseOnHit, Modifier:ExpeditionRelicModifierElitesRegenerateLifeEveryFourSeconds, Modifier:ExpeditionRelicModifierEssencesChest, Modifier:ExpeditionRelicModifierEssencesElite, Modifier:ExpeditionRelicModifierEternalEmpireEnchantChest, Modifier:ExpeditionRelicModifierEternalEmpireEnchantElite, Modifier:ExpeditionRelicModifierEternalEmpireLegionChest, Modifier:ExpeditionRelicModifierEternalEmpireLegionElite, Modifier:ExpeditionRelicModifierExpeditionBasicCurrencyChest, Modifier:ExpeditionRelicModifierExpeditionBasicCurrencyElite ~~ ~~, Modifier:ExpeditionRelicModifierExpeditionCorruptedItemsElite, Modifier:ExpeditionRelicModifierExpeditionCurrencyQuantityChest, Modifier:ExpeditionRelicModifierExpeditionCurrencyQuantityMonster~~, Modifier:ExpeditionRelicModifierExpeditionFracturedItemsChest, Modifier:ExpeditionRelicModifierExpeditionFracturedItemsElite, Modifier:ExpeditionRelicModifierExpeditionFullyLinkedElite~~, Modifier:ExpeditionRelicModifierExpeditionGemsChest, Modifier:ExpeditionRelicModifierExpeditionGemsElite, Modifier:ExpeditionRelicModifierExpeditionInfluencedItemsElite ~~ ~~, Modifier:ExpeditionRelicModifierExpeditionInfluencedtemsChest~~, Modifier:ExpeditionRelicModifierExpeditionLogbookQuantityChest, Modifier:ExpeditionRelicModifierExpeditionLogbookQuantityMonster, Modifier:ExpeditionRelicModifierExpeditionLogbookQuantityMonster, Modifier:ExpeditionRelicModifierExpeditionMapsChest~, Modifier:ExpeditionRelicModifierExpeditionMapsElite~, Modifier:ExpeditionRelicModifierExpeditionRareArmourChest~, Modifier:ExpeditionRelicModifierExpeditionRareArmourElite~, Modifier:ExpeditionRelicModifierExpeditionRareTrinketChest, Modifier:ExpeditionRelicModifierExpeditionRareTrinketElite, Modifier:ExpeditionRelicModifierExpeditionRareWeaponChest~~, Modifier:ExpeditionRelicModifierExpeditionRareWeaponElite, Modifier:ExpeditionRelicModifierExpeditionTalismanChest, Modifier:ExpeditionRelicModifierExpeditionTalismanElite ~~ ~~, Modifier:ExpeditionRelicModifierExpeditionUniqueChest~, Modifier:ExpeditionRelicModifierExpeditionUniqueElite, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionChest1, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionChest2, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionChest3, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionChest4, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionElite1, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionElite2, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionElite3, Modifier:ExpeditionRelicModifierExpeditionVendorCurrencyFactionElite4, Modifier:ExpeditionRelicModifierExperience~1 ~~ ~~, Modifier:ExpeditionRelicModifierExperience~2, Modifier:ExpeditionRelicModifierExperience~3~, Modifier:ExpeditionRelicModifierExperience~4, Modifier:ExpeditionRelicModifierFirePenetration~, Modifier:ExpeditionRelicModifierFossilsChest, Modifier:ExpeditionRelicModifierFossilsElite, Modifier:ExpeditionRelicModifierGrantNoFlaskCharges, Modifier:ExpeditionRelicModifierHarbingerCurrencyChest~, Modifier:ExpeditionRelicModifierHarbingerCurrencyElite, Modifier:ExpeditionRelicModifierHeistContractChest, Modifier:ExpeditionRelicModifierHeistContractElite, Modifier:ExpeditionRelicModifierHitsCannotBeEvaded, Modifier:ExpeditionRelicModifierHitsRemoveManaAndEnergyShieldOnHit, Modifier:ExpeditionRelicModifierIgnoreArmour~, Modifier:ExpeditionRelicModifierImmuneChaosDamage, Modifier:ExpeditionRelicModifierImmuneColdDamage, Modifier:ExpeditionRelicModifierImmuneFireDamage~, Modifier:ExpeditionRelicModifierImmuneLightningDamage, Modifier:ExpeditionRelicModifierImmunePhysicalDamage, Modifier:ExpeditionRelicModifierImmuneStatusAilments~, Modifier:ExpeditionRelicModifierImmuneToCurses~~, Modifier:ExpeditionRelicModifierImpaleOnHitImpaleEffect~, Modifier:ExpeditionRelicModifierItemQuantityChest~, Modifier:ExpeditionRelicModifierItemQuantityMonster, Modifier:ExpeditionRelicModifierItemRarityChest, Modifier:ExpeditionRelicModifierItemRarityMonster ~~ ~~ ~, Modifier:ExpeditionRelicModifierKaruiFossilChest~, Modifier:ExpeditionRelicModifierKaruiFossilElite, Modifier:ExpeditionRelicModifierKaruiShardsChest, Modifier:ExpeditionRelicModifierKaruiShardsElite, Modifier:ExpeditionRelicModifierLegionSplintersChest, Modifier:ExpeditionRelicModifierLegionSplintersElite, Modifier:ExpeditionRelicModifierLife~~, Modifier:ExpeditionRelicModifierLightningPenetration, Modifier:ExpeditionRelicModifierLostMenEssenceChest, Modifier:ExpeditionRelicModifierLostMenEssenceElite~~, Modifier:ExpeditionRelicModifierLostMenUniqueChest, Modifier:ExpeditionRelicModifierLostMenUniqueElite, Modifier:ExpeditionRelicModifierMagicMonsterChance, Modifier:ExpeditionRelicModifierMarakethDivinationChest, Modifier:ExpeditionRelicModifierMarakethDivinationElite, Modifier:ExpeditionRelicModifierMarakethIncubatorChest~, Modifier:ExpeditionRelicModifierMarakethIncubatorElite~, Modifier:ExpeditionRelicModifierMetamorphCatalystsChest, Modifier:ExpeditionRelicModifierMetamorphCatalystsElite, Modifier:ExpeditionRelicModifierMonkeyTribeAbyssChest~, Modifier:ExpeditionRelicModifierMonkeyTribeAbyssElite, Modifier:ExpeditionRelicModifierMonkeyTribeFragmentsChest ~~ ~~, Modifier:ExpeditionRelicModifierMonkeyTribeFragmentsElite, Modifier:ExpeditionRelicModifierPackSize, Modifier:ExpeditionRelicModifierRareMonsterChance, Modifier:ExpeditionRelicModifierReducedDamageTaken~~, Modifier:ExpeditionRelicModifierResistancesAndMaxResistances, Modifier:ExpeditionRelicModifierSirensBreachChest~, Modifier:ExpeditionRelicModifierSirensBreachElite, Modifier:ExpeditionRelicModifierSirensScarabChest, Modifier:ExpeditionRelicModifierSirensScarabElite, Modifier:ExpeditionRelicModifierSpeed, Modifier:ExpeditionRelicModifierStackedDeckChest~, Modifier:ExpeditionRelicModifierStackedDeckElite~~, Modifier:ExpeditionRelicModifierTemplarCatalystChest~, Modifier:ExpeditionRelicModifierTemplarCatalystElite, Modifier:ExpeditionRelicModifierTemplarDeliriumChest ~~ ~~, Modifier:ExpeditionRelicModifierTemplarDeliriumElite, Modifier:ExpeditionRelicModifierVaalGemsChest~~, Modifier:ExpeditionRelicModifierVaalGemsElite~~, Modifier:ExpeditionRelicModifierVaalOilsChest, Modifier:ExpeditionRelicModifierVaalOilsElite, Modifier:ExpeditionRelicModifierWard,

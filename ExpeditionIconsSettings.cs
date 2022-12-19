@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Forms;
 using ExileCore.Shared.Attributes;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
@@ -67,11 +68,10 @@ public class ExpeditionIconsSettings : ISettings
     [JsonIgnore]
     public CustomNode DrawEliteMonstersInWorld { get; set; }
 
-    public ToggleNode CacheEntityPosition { get; set; } = new ToggleNode(true);
     public RangeNode<int> WorldIconSize { get; set; } = new RangeNode<int>(50, 25, 200);
     public RangeNode<int> MapIconSize { get; set; } = new RangeNode<int>(30, 15, 200);
 
-    [Menu("Good mods", 100)]
+    [Menu("Good mods", 100, CollapsedByDefault = true)]
     [JsonIgnore]
     public EmptyNode SettingsEmptyGood { get; set; }
 
@@ -85,7 +85,7 @@ public class ExpeditionIconsSettings : ISettings
     [Menu(null, parentIndex = 100)]
     public CustomNode GoodModsIconPicker { get; }
 
-    [Menu("Bad mods", 101)]
+    [Menu("Bad mods", 101, CollapsedByDefault = true)]
     [JsonIgnore]
     public EmptyNode SettingsEmptyBad { get; set; }
 
@@ -144,7 +144,7 @@ public class ExpeditionIconsSettings : ISettings
     [Menu("Warn for monster resistances", parentIndex = 101)]
     public ToggleNode WarnMonsterResist { get; set; } = new ToggleNode(false);
 
-    [Menu("Chest settings", index = 103)]
+    [Menu("Chest settings", index = 103, CollapsedByDefault = true)]
     [JsonIgnore]
     public EmptyNode ChestSettingsHeader { get; set; }
 
@@ -153,6 +153,8 @@ public class ExpeditionIconsSettings : ISettings
     public CustomNode ChestSettings { get; set; }
 
     public ExpeditionExplosiveSettings ExplosivesSettings { get; set; } = new ExpeditionExplosiveSettings();
+    public PlannerSettings PlannerSettings { get; set; } = new PlannerSettings();
+
 
     private bool PickIcon(string iconName, ref MapIconsIndex icon, Vector4 tintColor)
     {
@@ -167,8 +169,8 @@ public class ExpeditionIconsSettings : ISettings
         ImGui.SliderInt("Icon size (only in this menu)", ref IconPickerSize, 15, 60);
         ImGui.SliderInt("Icons per row", ref IconsPerRow, 5, 60);
         var icons = Enum.GetValues<MapIconsIndex>()
-           .Where(x => string.IsNullOrEmpty(_iconFilter) || x.ToString().Contains(_iconFilter, StringComparison.InvariantCultureIgnoreCase))
-           .ToArray();
+            .Where(x => string.IsNullOrEmpty(_iconFilter) || x.ToString().Contains(_iconFilter, StringComparison.InvariantCultureIgnoreCase))
+            .ToArray();
         for (var i = 0; i < icons.Length; i++)
         {
             var testIcon = icons[i];
@@ -259,6 +261,53 @@ public class ExpeditionIconsSettings : ISettings
 }
 
 [Submenu]
+public class PlannerSettings
+{
+    public HotkeyNode StartSearchHotkey { get; set; } = new HotkeyNode(Keys.F13);
+    public HotkeyNode StopSearchHotkey { get; set; } = new HotkeyNode(Keys.F13);
+    public HotkeyNode ClearSearchHotkey { get; set; } = new HotkeyNode(Keys.F13);
+
+    [JsonIgnore]
+    [ConditionalDisplay(nameof(IsSearchRunning), false)]
+    public ButtonNode StartSearch { get; set; } = new ButtonNode();
+
+    [JsonIgnore]
+    [ConditionalDisplay(nameof(IsSearchRunning))]
+    public ButtonNode StopSearch { get; set; } = new ButtonNode();
+
+    [JsonIgnore]
+    [ConditionalDisplay(nameof(HasSearchResult))]
+    public ButtonNode ClearSearch { get; set; } = new ButtonNode();
+
+    [Menu("Color for suggested explosive radius")]
+    public ColorNode ExplosiveColor { get; set; } = new ColorNode(Color.Purple);
+
+    public ColorNode MapLineColor { get; set; } = new ColorNode(Color.Red);
+    public ColorNode WorldLineColor { get; set; } = new ColorNode(Color.Orange);
+
+    [Menu("Color for captured entities in world")]
+    public ColorNode CapturedEntityWorldFrameColor { get; set; } = new ColorNode(Color.Purple);
+
+    [Menu("Color for captured entities on map")]
+    public ColorNode CapturedEntityMapFrameColor { get; set; } = new ColorNode(Color.Purple);
+
+    public RangeNode<float> MaximumGenerationTimeSeconds { get; set; } = new RangeNode<float>(5, 0, 60);
+    public RangeNode<int> SearchThreads { get; set; } = new RangeNode<int>(5, 0, 10);
+    public RangeNode<float> NewRandomPathInjectionRate { get; set; } = new RangeNode<float>(1f, 0, 2);
+    public RangeNode<float> PathMutateChance { get; set; } = new RangeNode<float>(0.5f, 0, 1);
+    public RangeNode<int> PathGenerationSize { get; set; } = new RangeNode<int>(100, 1, 1000);
+    public RangeNode<float> RunicMonsterWeight { get; set; } = new RangeNode<float>(3, 0, 5);
+    public RangeNode<float> NormalMonsterWeight { get; set; } = new RangeNode<float>(0.2f, 0, 5);
+    public RangeNode<float> ArtifactChestWeight { get; set; } = new RangeNode<float>(2, 0, 5);
+    public RangeNode<float> OtherChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+
+    internal bool HasSearchResult => SearchState != SearchState.Empty;
+    internal bool IsSearchRunning => SearchState == SearchState.Searching;
+
+    internal SearchState SearchState = SearchState.Empty;
+}
+
+[Submenu(CollapsedByDefault = true)]
 public class ExpeditionExplosiveSettings
 {
     [Menu("Show explosive radius")]
@@ -270,8 +319,8 @@ public class ExpeditionExplosiveSettings
     [Menu("Explosive radius")]
     public RangeNode<int> ExplosiveRadius { get; set; } = new RangeNode<int>(326, 10, 600);
 
-    [Menu("Automatically calculate Radius from Mapmods")]
-    public ToggleNode AutoCalculateRadius { get; set; } = new ToggleNode(true);
+    [Menu("Automatically calculate Radius from map mods")]
+    public ToggleNode CalculateRadiusAutomatically { get; set; } = new ToggleNode(true);
 
     [Menu("Merge explosive radii")]
     public ToggleNode EnableExplosiveRadiusMerging { get; set; } = new ToggleNode(true);
@@ -295,8 +344,15 @@ public class ExpeditionExplosiveSettings
     public ColorNode CapturedEntityMapFrameColor { get; set; } = new ColorNode(Color.Green);
 
     [Menu("Rectangle Thickness for captured entities in world")]
-    public RangeNode<int> CapturedEntityWorldFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
+    public RangeNode<int> CapturedEntityWorldFrameThickness { get; set; } = new RangeNode<int>(2, 1, 20);
 
     [Menu("Rectangle Thickness for captured entities on map")]
-    public RangeNode<int> CapturedEntityMapFrameThickness { get; set; } = new RangeNode<int>(1, 1, 20);
+    public RangeNode<int> CapturedEntityMapFrameThickness { get; set; } = new RangeNode<int>(2, 1, 20);
+}
+
+public enum SearchState
+{
+    Empty,
+    Searching,
+    Stopped,
 }
