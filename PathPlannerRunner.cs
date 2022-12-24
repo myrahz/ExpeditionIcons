@@ -12,7 +12,7 @@ namespace ExpeditionIcons;
 public class PathPlannerRunner
 {
     private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-    public bool IsRunning => !_task.IsCompleted;
+    public bool IsRunning => _task is { IsCompleted: false };
     public (List<Vector2> Path, double Score)[] BestValues;
     public List<Vector2> CurrentBestPath => BestValues?.MaxBy(x => x.Score).Path;
     public double CurrentBestScore => BestValues?.Max(x => x.Score) ?? 0;

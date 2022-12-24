@@ -10,6 +10,7 @@ using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
 using ExileCore.Shared.Nodes;
+using GameOffsets.Native;
 using ImGuiNET;
 using SharpDX;
 using Vector2 = System.Numerics.Vector2;
@@ -37,6 +38,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     private readonly ConcurrentDictionary<string, List<ExpeditionMarkerIconDescription>> _relicModIconMapping = new();
     private readonly ConcurrentDictionary<string, ExpeditionMarkerIconDescription> _metadataIconMapping = new();
     private readonly Dictionary<uint, EntityCacheItem> _cachedEntities = new Dictionary<uint, EntityCacheItem>();
+    private readonly ConcurrentDictionary<string, ExpeditionEntityType> _entityTypeCache = new();
     private double _mapScale;
     private Vector2 _mapCenter;
     private bool _largeMapOpen;
@@ -48,14 +50,16 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     private PathPlannerRunner _plannerRunner;
     private Vector2? _detonatorPos;
     private bool _zoneCleared;
+    private int[][] _pathfindingData;
+    private Vector2i _areaDimensions;
 
     private Camera Camera => GameController.Game.IngameState.Camera;
 
     private Vector2? DetonatorPos => _detonatorPos ??= RealDetonatorPos;
 
     private Vector2? RealDetonatorPos => DetonatorEntity is { } e
-            ? e.GridPosNum
-            : null;
+        ? e.GridPosNum
+        : null;
 
     private Entity DetonatorEntity =>
         GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
@@ -96,8 +100,9 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
     private void StartSearch()
     {
         _plannerRunner?.Stop();
-        _plannerRunner = new PathPlannerRunner();
-        _plannerRunner.Start(Settings.PlannerSettings, BuildEnvironment());
+        var plannerRunner = new PathPlannerRunner();
+        plannerRunner.Start(Settings.PlannerSettings, BuildEnvironment());
+        _plannerRunner = plannerRunner;
         Settings.PlannerSettings.SearchState = SearchState.Searching;
     }
 
@@ -117,6 +122,25 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         _detonatorPos = null;
         _cachedEntities.Clear();
         _zoneCleared = false;
+        _pathfindingData = GameController.IngameState.Data.RawPathfindingData;
+        _areaDimensions = GameController.IngameState.Data.AreaDimensions;
+    }
+
+    private ExpeditionEntityType GetEntityType(string path)
+    {
+        return _entityTypeCache.GetOrAdd(path, p => p switch
+        {
+            RelicPath => ExpeditionEntityType.Relic,
+            MarkerPath => ExpeditionEntityType.Marker,
+            _ when p.StartsWith("Metadata/Terrain/Leagues/Expedition/Tiles/ExpeditionChamber") => ExpeditionEntityType.Cave,
+            _ when p.StartsWith("Metadata/Terrain/Leagues/Expedition/Tiles/ExpeditionBossDispenser") => ExpeditionEntityType.Boss,
+            _ => ExpeditionEntityType.None,
+        });
+    }
+
+    private Vector3 ExpandWithTerrainHeight(Vector2 gridPosition)
+    {
+        return new Vector3(gridPosition.GridToWorld(), GameController.IngameState.Data.GetTerrainHeightAt(gridPosition));
     }
 
     private void DrawCirclesInWorld(List<Vector3> positions, float radius, Color color)
@@ -134,8 +158,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                     var (sin, cos) = MathF.SinCos(MathF.PI / 180 * i);
                     var offset = new Vector2(cos, sin) * radius;
                     var xy = position.Xy() + offset;
-                    var z = GameController.IngameState.Data.GetTerrainHeightAt(xy.WorldToGrid());
-                    var screen = Camera.WorldToScreen(new Vector3(xy, z));
+                    var screen = Camera.WorldToScreen(ExpandWithTerrainHeight(xy.WorldToGrid()));
                     return (xy, screen);
                 }
 
@@ -154,7 +177,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                     }
                 }
 
-                ImGui.GetForegroundDrawList().AddLine(c1, c2, color.ToImgui());
+                Graphics.DrawLine(c1, c2, 1, color);
             }
         }
     }
@@ -170,15 +193,14 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         };
         var detonatorPos = DetonatorPos;
         _playerGridPos = GameController.Player.GetComponent<Positioned>().WorldPosNum.WorldToGrid();
-        if (detonatorPos is { } dp && _playerGridPos.Distance(dp) < 90 && DetonatorEntity?.IsTargetable != true)
+        if (detonatorPos is { } dp && _playerGridPos.Distance(dp) < 90)
         {
-            ClearSearch();
-            _zoneCleared = true;
-            return null;
-        }
-        else
-        {
-            _zoneCleared = false;
+            _zoneCleared = DetonatorEntity?.IsTargetable != true;
+            if (_zoneCleared)
+            {
+                ClearSearch();
+                return null;
+            }
         }
 
         var ingameUi = GameController.Game.IngameState.IngameUi;
@@ -199,9 +221,10 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         _explosiveRange = ExplosiveBaseRange * (100 + GameController.IngameState.Data.MapStats?.GetValueOrDefault(GameStat.MapExpeditionMaximumPlacementDistancePct) ?? 0) / 100 *
                           GridToWorldMultiplier;
 
-        foreach (var entity in GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon])
+        foreach (var entity in new[] { EntityType.IngameIcon, EntityType.Terrain }
+                     .SelectMany(x => GameController.EntityListWrapper.ValidEntitiesByType[x]))
         {
-            if (entity.Path is MarkerPath or RelicPath)
+            if (GetEntityType(entity.Path) != ExpeditionEntityType.None)
             {
                 if (_cachedEntities.TryGetValue(entity.Id, out var oldValue))
                 {
@@ -228,9 +251,9 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         var relics = new List<(Vector2, IExpeditionRelic)>();
         foreach (var e in _cachedEntities.Values)
         {
-            switch (e.Path)
+            switch (GetEntityType(e.Path))
             {
-                case MarkerPath:
+                case ExpeditionEntityType.Marker:
                 {
                     var animatedMetaData = e.BaseAnimatedEntityMetadata;
                     if (animatedMetaData != null)
@@ -253,7 +276,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
                     continue;
                 }
-                case RelicPath:
+                case ExpeditionEntityType.Relic:
                 {
                     var mods = e.Mods;
                     if (mods == null)
@@ -283,6 +306,31 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
                     break;
                 }
+                case ExpeditionEntityType.Cave:
+                {
+                    //Shits given about performance: some? a few?
+                    for (int i = 0; i < Settings.PlannerSettings.LogbookCaveRunicMonsterMultiplier; i++)
+                    {
+                        loot.Add((e.GridPos, new RunicMonster()));
+                    }
+
+                    for (int i = 0; i < Settings.PlannerSettings.LogbookCaveArtifactChestMultiplier; i++)
+                    {
+                        loot.Add((e.GridPos, new ArtifactChest()));
+                    }
+
+                    break;
+                }
+                case ExpeditionEntityType.Boss:
+                {
+                    //Shits given about performance: some? a few?
+                    for (int i = 0; i < Settings.PlannerSettings.LogbookBossRunicMonsterMultiplier; i++)
+                    {
+                        loot.Add((e.GridPos, new RunicMonster()));
+                    }
+
+                    break;
+                }
             }
         }
 
@@ -292,7 +340,16 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
             _explosiveRange / GridToWorldMultiplier,
             _explosiveRadius / GridToWorldMultiplier,
             GameController.IngameState.IngameUi.ExpeditionDetonatorElement.RemainingExplosives,
-            detonatorPos);
+            detonatorPos,
+            IsValidPlacement);
+    }
+
+    private bool IsValidPlacement(Vector2 x)
+    {
+        return x.X >= 0 && x.Y >= 0 &&
+               x.X < _areaDimensions.X &&
+               x.Y < _areaDimensions.Y &&
+               _pathfindingData[(int)x.Y][(int)x.X] > 3;
     }
 
     public override void Render()
@@ -332,9 +389,9 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
         foreach (var e in _cachedEntities.Values)
         {
-            switch (e.Path)
+            switch (GetEntityType(e.Path))
             {
-                case MarkerPath:
+                case ExpeditionEntityType.Marker:
                 {
                     var animatedMetaData = e.BaseAnimatedEntityMetadata;
                     if (animatedMetaData != null)
@@ -357,7 +414,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                             var iconDescription = _metadataIconMapping.GetOrAdd(animatedMetaData,
                                 a =>
                                     Icons.LogbookChestIcons.FirstOrDefault(icon =>
-                                        icon.BaseEntityMetadataSubstrings.Any(a.Contains)));
+                                    icon.BaseEntityMetadataSubstrings.Any(a.Contains)));
                             if (iconDescription != null)
                             {
                                 var settings = Settings.IconMapping.GetValueOrDefault(iconDescription.IconPickerIndex, new IconDisplaySettings());
@@ -377,7 +434,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
                     continue;
                 }
-                case RelicPath:
+                case ExpeditionEntityType.Relic:
                 {
                     var mods = e.Mods;
                     if (e.Mods == null) continue;
@@ -472,7 +529,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
             }
 
             DrawCirclesInWorld(
-                positions: path.Select(p => new Vector3(p.GridToWorld(), GameController.IngameState.Data.GetTerrainHeightAt(p))).ToList(),
+                positions: path.Select(ExpandWithTerrainHeight).ToList(),
                 radius: _explosiveRadius,
                 color: Settings.PlannerSettings.ExplosiveColor.Value);
         }
@@ -584,7 +641,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
     private Vector2 GetWorldScreenPosition(Vector2 gridPos)
     {
-        return Camera.WorldToScreen(new Vector3(gridPos.GridToWorld(), GameController.IngameState.Data.GetTerrainHeightAt(gridPos)));
+        return Camera.WorldToScreen(ExpandWithTerrainHeight(gridPos));
     }
 
     private Vector2 GetEntityPosOnMapScreen(EntityCacheItem entity)
@@ -599,7 +656,17 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         return (float)_mapScale * new Vector2((delta.X - delta.Y) * CameraAngleCos, (deltaZ - (delta.X + delta.Y)) * CameraAngleSin);
     }
 
+    private enum ExpeditionEntityType
+    {
+        None,
+        Relic,
+        Marker,
+        Cave,
+        Boss,
+    }
+
     private record EntityCacheItem(string Path, Lazy<string> BaseAnimatedEntityMetadataCache, List<string> Mods, Vector3 Pos, Vector2 GridPos, float? RenderZ,
+        float? RenderSize,
         bool? MinimapIconHide)
     {
         public string BaseAnimatedEntityMetadata => BaseAnimatedEntityMetadataCache.Value;
@@ -613,6 +680,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                 Pos,
                 GridPos,
                 RenderZ ?? other.RenderZ,
+                RenderSize ?? other.RenderSize,
                 MinimapIconHide ?? MinimapIconHide);
         }
     }
@@ -620,7 +688,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
 
     public override void EntityAdded(Entity entity)
     {
-        if (entity.Type == EntityType.IngameIcon && entity.Path is MarkerPath or RelicPath)
+        if (entity.Type is EntityType.IngameIcon or EntityType.Terrain && GetEntityType(entity.Path) != ExpeditionEntityType.None)
         {
             _cachedEntities[entity.Id] = BuildCacheItem(entity);
         }
@@ -635,6 +703,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
             entity.PosNum,
             entity.PosNum.WorldToGrid(),
             entity.GetComponent<Render>()?.Z,
+            entity.GetComponent<Render>()?.BoundsNum is { } b ? Math.Min(b.X, b.Y) : null,
             entity.GetComponent<MinimapIcon>()?.IsHide);
     }
 }
