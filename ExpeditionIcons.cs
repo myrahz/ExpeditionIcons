@@ -65,6 +65,10 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
         GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
             .FirstOrDefault(x => x.Path == "Metadata/MiscellaneousObjects/Expedition/ExpeditionDetonator");
 
+    private int PlacedExplosiveCount =>
+        GameController.EntityListWrapper.ValidEntitiesByType[EntityType.IngameIcon]
+            .Count(x => x.Path == "Metadata/MiscellaneousObjects/Expedition/ExpeditionExplosive");
+
     public override bool Initialise()
     {
         Graphics.InitImage(TextureName);
@@ -339,7 +343,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
             loot.FindAll(x => x.Item2 != null),
             _explosiveRange / GridToWorldMultiplier,
             _explosiveRadius / GridToWorldMultiplier,
-            GameController.IngameState.IngameUi.ExpeditionDetonatorElement.RemainingExplosives,
+            GameController.IngameState.IngameUi.ExpeditionDetonatorElement.RemainingExplosives + PlacedExplosiveCount,
             detonatorPos,
             IsValidPlacement);
     }
@@ -414,7 +418,7 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                             var iconDescription = _metadataIconMapping.GetOrAdd(animatedMetaData,
                                 a =>
                                     Icons.LogbookChestIcons.FirstOrDefault(icon =>
-                                    icon.BaseEntityMetadataSubstrings.Any(a.Contains)));
+                                        icon.BaseEntityMetadataSubstrings.Any(a.Contains)));
                             if (iconDescription != null)
                             {
                                 var settings = Settings.IconMapping.GetValueOrDefault(iconDescription.IconPickerIndex, new IconDisplaySettings());
@@ -523,9 +527,12 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                 var worldPos = GetWorldScreenPosition(point);
                 Graphics.DrawLine(GetWorldScreenPosition(prevPoint), worldPos, 1, Settings.PlannerSettings.WorldLineColor);
                 var text = $"#{i}";
-                Graphics.DrawBox(worldPos, worldPos + Graphics.MeasureText(text), Color.Black);
-                Graphics.DrawText(text, worldPos, Color.White);
-                prevPoint = point;
+                using (Graphics.SetTextScale(Settings.PlannerSettings.TextMarkerScale))
+                {
+                    Graphics.DrawBox(worldPos, worldPos + Graphics.MeasureText(text), Color.Black);
+                    Graphics.DrawText(text, worldPos, Color.White);
+                    prevPoint = point;
+                }
             }
 
             DrawCirclesInWorld(

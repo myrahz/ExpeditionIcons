@@ -291,8 +291,10 @@ public class PlannerSettings
     [Menu("Color for captured entities on map")]
     public ColorNode CapturedEntityMapFrameColor { get; set; } = new ColorNode(Color.Purple);
 
+    public RangeNode<float> TextMarkerScale { get; set; } = new RangeNode<float>(1, 0, 5);
+
     public RangeNode<float> MaximumGenerationTimeSeconds { get; set; } = new RangeNode<float>(5, 0, 60);
-    public RangeNode<int> SearchThreads { get; set; } = new RangeNode<int>(5, 0, 10);
+    public RangeNode<int> SearchThreads { get; set; } = new RangeNode<int>(5, 1, 10);
     public RangeNode<float> NewRandomPathInjectionRate { get; set; } = new RangeNode<float>(1f, 0, 2);
     public RangeNode<float> PathMutateChance { get; set; } = new RangeNode<float>(0.5f, 0, 1);
     public RangeNode<int> PathGenerationSize { get; set; } = new RangeNode<int>(100, 1, 1000);

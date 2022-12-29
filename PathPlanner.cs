@@ -132,6 +132,11 @@ public class PathPlanner
     private bool TryApplySkipMutation(List<Vector2> path, ExpeditionEnvironment environment)
     {
         var pathCount = path.Count - 2;
+        if (pathCount <= 0)
+        {
+            return false;
+        }
+
         var searchStartOffset = Random.Shared.Next(0, pathCount + 1);
         if (searchStartOffset == pathCount)
         {
@@ -165,6 +170,11 @@ public class PathPlanner
     private bool TryApplySwapMutation(List<Vector2> path, ExpeditionEnvironment environment)
     {
         var pathCount = path.Count - 3;
+        if (pathCount <= 0)
+        {
+            return false;
+        }
+
         var searchStartOffset = Random.Shared.Next(0, pathCount);
         for (int i = 0; i < pathCount; i++)
         {
@@ -198,6 +208,12 @@ public class PathPlanner
 
     public IEnumerable<PathState> GetBestPathSeries(ExpeditionEnvironment environment)
     {
+        if (environment.MaxExplosions <= 0)
+        {
+            yield return new PathState(new List<Vector2>(), 0);
+            yield break;
+        }
+
         var bestPath = Enumerable.Repeat(Vector2.Zero, environment.MaxExplosions).ToList();
         var batch = Enumerable.Range(0, _settings.PathGenerationSize * 2).Select(_ => BuildPath(environment)).ToList();
         while (true)
