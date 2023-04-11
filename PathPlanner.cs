@@ -251,6 +251,33 @@ public class PathPlanner
                 ArtifactChest => _settings.ArtifactChestWeight,
                 OtherChest => _settings.OtherChestWeight,
                 NormalMonster => _settings.NormalMonsterWeight,
+                BlightChest => _settings.BlightChestWeight,
+                FragmentChest => _settings.FragmentChestWeight,
+                JewelryChest => _settings.JewelryChestWeight,
+                WeaponChest => _settings.WeaponChestWeight,
+                CurrencyChest => _settings.CurrencyChestWeight,
+                HeistChest => _settings.HeistChestWeight,
+                BreachChest => _settings.BreachChestWeight,
+                RitualChest => _settings.RitualChestWeight,
+                MetamorphChest => _settings.MetamorphChestWeight,
+                MapsChest => _settings.MapsChestWeight,
+                FossilsChest => _settings.FossilsChestWeight,
+                DivinationChest => _settings.DivinationChestWeight,
+                GemsChest => _settings.GemsChestWeight,
+                EssenceChest => _settings.EssenceChestWeight,
+                ArmourChest => _settings.ArmourChestWeight,
+                LegionChest => _settings.LegionChestWeight,
+                DeliriumChest => _settings.DeliriumChestWeight,
+                UniquesChest => _settings.UniquesChestWeight,
+                HarbingerChest => _settings.HarbingerChestWeight,
+
+                  
+
+
+
+
+
+
             };
             _lootValueTable.TrimExcess();
         }
@@ -492,6 +519,60 @@ public record WarningRelic : IExpeditionRelic
     }
 }
 
+
+public class OtherGoodSpecificMonsterRelic : IExpeditionRelic
+{
+    public (double, double) GetScoreMultiplier(IExpeditionLoot loot)
+    {
+        if (loot is IMonster)
+        {
+            return (1, 0.15);
+        }
+
+        return (1, 0);
+    }
+}
+
+public class OtherGoodSpecificChestRelic : IExpeditionRelic
+{
+    public (double, double) GetScoreMultiplier(IExpeditionLoot loot)
+    {
+        if (loot is IChest)
+        {
+            return (1, 0.15);
+        }
+
+        return (1, 0);
+    }
+}
+
+public class OtherBadSpecificMonsterRelic : IExpeditionRelic
+{
+    public (double, double) GetScoreMultiplier(IExpeditionLoot loot)
+    {
+        if (loot is IMonster)
+        {
+            return (1, 0.05);
+        }
+
+        return (1, 0);
+    }
+}
+
+public class OtherBadSpecificChestRelic : IExpeditionRelic
+{
+    public (double, double) GetScoreMultiplier(IExpeditionLoot loot)
+    {
+        if (loot is IChest)
+        {
+            return (1, 0.05);
+        }
+
+        return (1, 0);
+    }
+}
+
+
 public interface IExpeditionLoot
 {
 }
@@ -513,6 +594,78 @@ public class NormalMonster : IMonster
 }
 
 public class ArtifactChest : IChest
+{
+}
+
+public class BlightChest : IChest
+{
+}
+
+public class FragmentChest : IChest
+{
+}
+
+public class JewelryChest : IChest
+{
+}
+
+public class WeaponChest : IChest
+{
+}
+
+public class CurrencyChest : IChest
+{
+}
+
+public class HeistChest : IChest
+{
+}
+
+public class BreachChest : IChest
+{
+}
+public class RitualChest : IChest
+{
+}
+public class MetamorphChest : IChest
+{
+}
+public class MapsChest : IChest
+{
+}
+
+public class FossilsChest : IChest
+{
+}
+
+public class DivinationChest : IChest
+{
+}
+
+public class GemsChest : IChest
+{
+}
+
+public class EssenceChest : IChest
+{
+}
+
+public class ArmourChest : IChest
+{
+}
+
+public class LegionChest : IChest
+{
+}
+
+public class DeliriumChest : IChest
+{
+}
+public class UniquesChest : IChest
+{
+}
+
+public class HarbingerChest : IChest
 {
 }
 

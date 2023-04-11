@@ -26,6 +26,50 @@ public static class Icons
             "ExpeditionRelicModifierExpeditionBasicCurrencyElite" => new OtherGoodMonsterRelic(),
             "ExpeditionRelicModifierStackedDeckChest" => new OtherGoodChestRelic(),
             "ExpeditionRelicModifierStackedDeckElite" => new OtherGoodMonsterRelic(),
+
+
+            "ExpeditionRelicModifierVaalGemsChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierMarakethIncubatorChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierLostMenUniqueChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierTemplarDeliriumChest  " => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierMarakethDivinationChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierKaruiShardsChest" => new OtherGoodSpecificChestRelic(),
+            
+
+            "ExpeditionRelicModifierVaalGemsElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierMarakethIncubatorElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierLostMenUniqueElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierTemplarDeliriumElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierMarakethDivinationElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierKaruiShardsElite" => new OtherGoodSpecificChestRelic(),
+           
+
+            "ExpeditionRelicModifierMonkeyTribeAbyssChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierMonkeyTribeFragmentsChest  " => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierKaruiFossilChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierVaalOilsChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierSirensBreachChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierTemplarCatalystChest" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierLostMenEssenceChest" => new OtherGoodSpecificChestRelic(),
+
+            "ExpeditionRelicModifierMonkeyTribeAbyssElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierMonkeyTribeFragmentsElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierKaruiFossilElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierVaalOilsElite," => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierSirensBreachElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierTemplarCatalystElite" => new OtherGoodSpecificChestRelic(),
+            "ExpeditionRelicModifierLostMenEssenceElite" => new OtherGoodSpecificChestRelic(),
+
+
+
+
+
+
+
+
+            //other specific
+
+
             _ when relicMod.Contains("Monster") => new OtherMonsterRelic(),
             _ when relicMod.Contains("Chest") => new OtherChestRelic(),
             _ => null,

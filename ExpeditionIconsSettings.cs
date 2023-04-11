@@ -302,6 +302,26 @@ public class PlannerSettings
     public RangeNode<float> RunicMonsterWeight { get; set; } = new RangeNode<float>(3, 0, 5);
     public RangeNode<float> NormalMonsterWeight { get; set; } = new RangeNode<float>(0.2f, 0, 5);
     public RangeNode<float> ArtifactChestWeight { get; set; } = new RangeNode<float>(2, 0, 5);
+    public RangeNode<float> BlightChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> FragmentChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> JewelryChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> WeaponChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> CurrencyChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> HeistChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> BreachChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> RitualChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> MetamorphChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> MapsChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> FossilsChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> DivinationChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> GemsChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> EssenceChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> ArmourChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> LegionChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> DeliriumChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> UniquesChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+    public RangeNode<float> HarbingerChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
+
     public RangeNode<float> OtherChestWeight { get; set; } = new RangeNode<float>(1, 0, 5);
     public RangeNode<int> LogbookCaveRunicMonsterMultiplier { get; set; } = new RangeNode<int>(3, 0, 10);
     public RangeNode<int> LogbookCaveArtifactChestMultiplier { get; set; } = new RangeNode<int>(3, 0, 10);

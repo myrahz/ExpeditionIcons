@@ -271,12 +271,98 @@ public class ExpeditionIcons : BaseSettingsPlugin<ExpeditionIconsSettings>
                             var iconDescription = _metadataIconMapping.GetOrAdd(animatedMetaData,
                                 a => Icons.LogbookChestIcons.FirstOrDefault(icon =>
                                     icon.BaseEntityMetadataSubstrings.Any(a.Contains)));
-                            if (iconDescription != null)
-                            {
-                                loot.Add((e.GridPos, new OtherChest()));
+                                //
+                                //{
+                                //    loot.Add((e.GridPos, new OtherChest()));
+                                //}
+                                if (iconDescription != null)
+                                { 
+                                    if (animatedMetaData.Contains("ChestLeague"))
+                                    {
+                                        loot.Add((e.GridPos, new ArtifactChest()));
+                                    }
+
+                                    else if (animatedMetaData.Contains("ChestBlight"))
+                                    {
+                                        loot.Add((e.GridPos, new BlightChest()));
+                                    }
+
+                                    else if (animatedMetaData.Contains("ChestFragments"))
+                                    {
+                                        loot.Add((e.GridPos, new FragmentChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestTrinkets"))
+                                    {
+                                        loot.Add((e.GridPos, new JewelryChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestCurrency"))
+                                    {
+                                        loot.Add((e.GridPos, new CurrencyChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestWeapon"))
+                                    {
+                                        loot.Add((e.GridPos, new WeaponChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestHeist"))
+                                    {
+                                        loot.Add((e.GridPos, new HeistChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestBreach"))
+                                    {
+                                        loot.Add((e.GridPos, new BreachChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestRitual"))
+                                    {
+                                        loot.Add((e.GridPos, new RitualChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestMetamorph"))
+                                    {
+                                        loot.Add((e.GridPos, new MetamorphChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestMaps"))
+                                    {
+                                        loot.Add((e.GridPos, new MapsChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestFossils"))
+                                    {
+                                        loot.Add((e.GridPos, new FossilsChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestDivinationCards"))
+                                    {
+                                        loot.Add((e.GridPos, new DivinationChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestGems"))
+                                    {
+                                        loot.Add((e.GridPos, new GemsChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestEssence"))
+                                    {
+                                        loot.Add((e.GridPos, new EssenceChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestArmour"))
+                                    {
+                                        loot.Add((e.GridPos, new ArmourChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestLegion"))
+                                    {
+                                        loot.Add((e.GridPos, new LegionChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestDelirium"))
+                                    {
+                                        loot.Add((e.GridPos, new DeliriumChest()));
+                                    }
+                                    else if (animatedMetaData.Contains("ChestUniques"))
+                                    {
+                                        loot.Add((e.GridPos, new UniquesChest()));
+                                    }
+                                    else
+                                    {
+                                        loot.Add((e.GridPos, new OtherChest()));
+                                    }
+                                }
+
                             }
                         }
-                    }
 
                     continue;
                 }
